@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    # H2 Database
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  # H2 Client
+  h2:
+    console:
+      enabled: true  # Enables the H2 console for management
+      path: /h2-console # Specifies the path to access the console
+  # JPA
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect # Specifies the Hibernate dialect for H2
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    #generate-ddl: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+server:
+  port: 8080
+
+
+
+
