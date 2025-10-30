@@ -1,0 +1,40 @@
+### parameters
+### Criar produto no Microserviço A
+POST http://localhost:8080/products
+Content-Type: application/json
+
+{
+"name":"Notebook Gamer",
+"description":"RTX 4060 16GB",
+"price":4500
+}
+
+
+###
+POST http://localhost:8080/products
+Content-Type: application/json
+
+{
+"name":"Monitor LCD 27",
+"description":"AOC 27 Polegadas 5ms",
+"price":989
+}
+
+###
+GET http://localhost:8081/search/products/rtx
+
+###
+GET http://localhost:8081/search/products/gammer
+
+###
+GET http://localhost:8081/search/products/notibook
+
+###
+GET http://localhost:8081/search/products/lcd
+
+###
+GET http://localhost:8081/search/products/minitor
+
+
+### listar todos
+GET http://localhost:8081/search/products/listar-todos
