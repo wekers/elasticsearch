@@ -35,6 +35,27 @@ GET http://localhost:8081/search/products/lcd
 ###
 GET http://localhost:8081/search/products/minitor
 
-
 ### listar todos
 GET http://localhost:8081/search/products/listar-todos
+
+
+### Catalogo
+### Busca por texto
+GET http://localhost:8081/catalogo/search?query=gamer
+
+### Busca com erro de digitação (fuzzy)
+GET http://localhost:8081/catalogo/search?query=gammer
+
+### Faixa de preço
+GET http://localhost:8081/catalogo/search?minPrice=3000&maxPrice=6000
+
+### Ordenação
+GET http://localhost:8081/catalogo/search?sort=price&direction=desc
+
+### Buscar tudo ao mesmo tempo
+GET http://localhost:8081/catalogo/search?query=gamer&minPrice=3000&maxPrice=6000&page=0&size=5&sort=price,asc
+
+###?sort=price,asc
+###?sort=price,desc
+###?sort=name,asc
+###?sort=name,desc
