@@ -9,6 +9,15 @@ Content-Type: application/json
 "price":4500
 }
 
+###
+POST http://localhost:8080/products
+Content-Type: application/json
+
+{
+"name":"Notebook Lenovo Ryzen",
+"description":"Memory 24GB",
+"price":4500
+}
 
 ###
 POST http://localhost:8080/products
@@ -59,3 +68,9 @@ GET http://localhost:8081/catalogo/search?query=gamer&minPrice=3000&maxPrice=600
 ###?sort=price,desc
 ###?sort=name,asc
 ###?sort=name,desc
+
+
+# Autocomplete
+GET http://localhost:8081/catalogo/suggest?prefix=no
+
+###
