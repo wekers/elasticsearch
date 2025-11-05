@@ -1,9 +1,11 @@
 package com.wekers.microsb.controller;
 
-import com.wekers.microsb.document.ProductDocument;
+import com.wekers.microsb.dto.CatalogSearchResponse;
 import com.wekers.microsb.service.CatalogSearchService;
-import org.springframework.data.domain.Page;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/catalogo")
@@ -16,7 +18,7 @@ public class CatalogController {
     }
 
     @GetMapping("/search")
-    public Page<ProductDocument> search(
+    public CatalogSearchResponse search(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Double minPrice,
             @RequestParam(required = false) Double maxPrice,

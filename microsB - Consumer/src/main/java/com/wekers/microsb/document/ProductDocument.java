@@ -1,5 +1,6 @@
 package com.wekers.microsb.document;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
@@ -21,6 +22,14 @@ public class ProductDocument {
 
     @Field(type = FieldType.Text)
     private String description;
+
+    @Field(type = FieldType.Text, analyzer = "standard")
+    private String name_spell; // ← usado para correção ortográfica
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String correctedQuery;
+
+
 
     // Getters and setters
 
@@ -54,5 +63,21 @@ public class ProductDocument {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getCorrectedQuery() {
+        return correctedQuery;
+    }
+
+    public void setCorrectedQuery(String correctedQuery) {
+        this.correctedQuery = correctedQuery;
+    }
+
+    public String getNameSpell() {
+        return name_spell;
+    }
+
+    public void setNameSpell(String nameSpell) {
+        this.name_spell = nameSpell;
     }
 }

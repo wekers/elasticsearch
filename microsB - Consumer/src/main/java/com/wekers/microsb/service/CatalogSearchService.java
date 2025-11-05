@@ -1,36 +1,52 @@
 package com.wekers.microsb.service;
 
-import co.elastic.clients.json.JsonData;
-import com.wekers.microsb.document.ProductDocument;
+
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
-import co.elastic.clients.elasticsearch._types.query_dsl.RangeQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch._types.query_dsl.RangeQuery;
+import co.elastic.clients.json.JsonData;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wekers.microsb.document.ProductDocument;
+
+import com.wekers.microsb.dto.CatalogSearchResponse;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.Request;
+import org.elasticsearch.client.Response;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.HighlightQuery;
 import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightParameters;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CatalogSearchService {
 
     private final ElasticsearchOperations operations;
+    private final ElasticsearchClient esClient;
 
-    public CatalogSearchService(ElasticsearchOperations operations) {
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    public CatalogSearchService(ElasticsearchOperations operations, ElasticsearchClient esClient) {
         this.operations = operations;
+        this.esClient = esClient;
     }
 
-    public Page<ProductDocument> search(
+    public CatalogSearchResponse search(
             String query,
             Double minPrice,
             Double maxPrice,
@@ -80,6 +96,8 @@ public class CatalogSearchService {
                 )
         );
 
+        HighlightQuery highlightQuery = new HighlightQuery(highlight, ProductDocument.class);
+
 
         var nativeQuery = NativeQuery.builder()
                 .withQuery(Query.of(q -> q.bool(boolQuery)))
@@ -91,6 +109,137 @@ public class CatalogSearchService {
                 .build();
 
         var searchHits = operations.search(nativeQuery, ProductDocument.class);
+
+
+
+        // Se encontrou, beleza
+        if (searchHits.getTotalHits() > 0) {
+            return new CatalogSearchResponse(
+                    buildHighlightedResult(searchHits, page, size),
+                    List.of(),
+                    null
+            );
+
+        }
+
+        if (searchHits.getTotalHits() == 0) {
+            return new CatalogSearchResponse(
+                    new PageImpl<>(List.of(), PageRequest.of(page, size), 0),
+                    suggestVocabulary(),
+                    null
+            );
+        }
+
+
+        // Caso contrário → tentar correção
+        String corrected = correctQuery(query);
+
+        // Se a correção não mudou nada → retorna sugestões
+        if (corrected.equalsIgnoreCase(query)) {
+            return new CatalogSearchResponse(
+                    new PageImpl<>(List.of(), PageRequest.of(page, size), 0),
+                    suggestVocabulary(), // sugerimos termos úteis
+                    null // não houve correção
+            );
+        }
+
+        // Reexecuta a busca usando o termo corrigido
+        var correctedQuery = NativeQuery.builder()
+                .withQuery(Query.of(q -> q.multiMatch(
+                        MultiMatchQuery.of(m -> m
+                                .query(corrected)
+                                .fields("name^3", "description^1")
+                                .fuzziness("AUTO")
+                        )
+                )))
+                .withHighlightQuery(highlightQuery) // reutilize o mesmo highlight!
+                .withPageable(PageRequest.of(page, size))
+                .build();
+
+        var correctedHits = operations.search(correctedQuery, ProductDocument.class);
+
+        // Retorna resultados + informação da correção
+        var resultPage = buildHighlightedResult(correctedHits, page, size);
+        resultPage.getContent().forEach(item -> item.setCorrectedQuery(corrected));
+        return new CatalogSearchResponse(
+                resultPage,
+                List.of(corrected),
+                corrected
+        );
+
+
+    }
+
+    private String correctQuery(String originalQuery) {
+        if (originalQuery == null || originalQuery.isBlank()) return originalQuery;
+
+        try {
+
+            var transport = (co.elastic.clients.transport.rest_client.RestClientTransport) esClient._transport();
+            RestClient low = transport.restClient();
+
+            String json = """
+        {
+          "size": 0,
+          "suggest": {
+            "spellcheck": {
+              "text": "%s",
+              "term": {
+                "field": "name_spell",
+                "suggest_mode": "always",
+                "max_edits": 2
+              }
+            }
+          }
+        }
+        """.formatted(originalQuery);
+
+            Request request = new Request("POST", "/products/_search");
+            request.setJsonEntity(json);
+
+            Response response = low.performRequest(request);
+
+            var root = mapper.readTree(response.getEntity().getContent());
+            var suggest = root.path("suggest").path("spellcheck");
+            if (!suggest.isArray()) return originalQuery;
+
+            for (var entry : suggest) {
+                for (var opt : entry.path("options")) {
+                    var suggestion = opt.path("text").asText();
+                    if (!suggestion.isBlank()) {
+                        return suggestion;
+                    }
+                }
+            }
+
+            return originalQuery;
+
+        } catch (Exception e) {
+            return originalQuery;
+        }
+    }
+
+    private List<String> suggestVocabulary() {
+        var hits = operations.search(
+                NativeQuery.builder()
+                        .withFields("name_spell")
+                        .withPageable(PageRequest.of(0, 100))
+                        .build(),
+                ProductDocument.class
+        );
+
+        return hits.getSearchHits().stream()
+                .map(h -> h.getContent().getNameSpell())
+                .filter(s -> s != null)
+                .flatMap(s -> List.of(s.split("\\s+")).stream())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+
+    private Page<ProductDocument> buildHighlightedResult(
+            SearchHits<ProductDocument> searchHits, int page, int size) {
 
         List<ProductDocument> results = searchHits.getSearchHits().stream().map(hit -> {
             var p = hit.getContent();
@@ -105,4 +254,7 @@ public class CatalogSearchService {
 
         return new PageImpl<>(results, PageRequest.of(page, size), searchHits.getTotalHits());
     }
+
+
+
 }

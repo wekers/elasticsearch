@@ -34,6 +34,7 @@ public class ProductConsumer {
         doc.setName(event.getName());
         doc.setDescription(event.getDescription());
         doc.setPrice(event.getPrice());
+        doc.setNameSpell(doc.getName());
 
         // 3) Indexa no ES
         esRepository.save(doc);
