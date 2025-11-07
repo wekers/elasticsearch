@@ -55,6 +55,9 @@ GET http://localhost:8081/catalogo/search?query=gamer
 ### Busca com erro de digitação (fuzzy)
 GET http://localhost:8081/catalogo/search?query=gammer
 
+### Erro na digitação feio, não encontrado, então sugesões
+GET http://localhost:8081/catalogo/search?query=notbuk
+
 ### Faixa de preço
 GET http://localhost:8081/catalogo/search?minPrice=3000&maxPrice=6000
 
