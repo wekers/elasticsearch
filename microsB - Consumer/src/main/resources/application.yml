@@ -6,5 +6,16 @@ spring:
     port: 5672
     username: guest
     password: guest
+    listener:
+      simple:
+        acknowledge-mode: MANUAL
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 5
+          initial-interval: 2000ms
+          multiplier: 2.0
+          max-interval: 30000ms
+
 server:
   port: 8081
