@@ -1,18 +1,38 @@
 {
-  "analysis": {
-    "analyzer": {
-      "autocomplete_analyzer": {
-        "tokenizer": "autocomplete_tokenizer",
-        "filter": ["lowercase"]
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "analysis": {
+        "analyzer": {
+          "autocomplete_analyzer": {
+            "tokenizer": "autocomplete_tokenizer",
+            "filter": ["lowercase"]
+          },
+          "autocomplete_search_analyzer": {
+            "tokenizer": "standard",
+            "filter": ["lowercase"]
+          }
+        },
+        "tokenizer": {
+          "autocomplete_tokenizer": {
+            "type": "edge_ngram",
+            "min_gram": 2,
+            "max_gram": 20,
+            "token_chars": ["letter", "digit"]
+          }
+        }
       }
-    },
-    "tokenizer": {
-      "autocomplete_tokenizer": {
-        "type": "edge_ngram",
-        "min_gram": 2,
-        "max_gram": 20,
-        "token_chars": ["letter", "digit"]
-      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "name": { "type": "text", "analyzer": "autocomplete_analyzer", "search_analyzer": "autocomplete_search_analyzer" },
+      "name_spell": { "type": "text" },
+      "price": { "type": "float" },
+      "description": { "type": "text" },
+      "correctedQuery": { "type": "keyword", "index": false }
     }
   }
 }
