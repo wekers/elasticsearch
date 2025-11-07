@@ -11,6 +11,19 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     networks:
       - microservices-net
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: microsa
+      POSTGRES_USER: microsa
+      POSTGRES_PASSWORD: microsa
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices-net
+
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.1
@@ -51,3 +64,4 @@ networks:
 
 volumes:
   esdata:
+  pgdata: {}
