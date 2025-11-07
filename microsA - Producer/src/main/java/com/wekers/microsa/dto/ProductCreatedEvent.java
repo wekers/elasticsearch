@@ -1,20 +1,22 @@
 package com.wekers.microsa.dto;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.UUID;
 
 public class ProductCreatedEvent implements Serializable {
-    private Long id;
+    private UUID id;
     private String name;
-    private double price;
+    private BigDecimal price;
     private String description;
 
     // Getters and Setters
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
@@ -26,11 +28,11 @@ public class ProductCreatedEvent implements Serializable {
         this.name = name;
     }
 
-    public double getPrice() {
+    public BigDecimal getPrice() {
         return price;
     }
 
-    public void setPrice(double price) {
+    public void setPrice(BigDecimal price) {
         this.price = price;
     }
 
