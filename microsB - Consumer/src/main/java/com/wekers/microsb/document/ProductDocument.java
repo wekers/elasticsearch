@@ -7,6 +7,8 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.annotations.Setting;
 
+import java.math.BigDecimal;
+
 @Document(indexName = "products")
 @Setting(settingPath = "/elasticsearch/product-settings.json")
 public class ProductDocument {
@@ -18,7 +20,7 @@ public class ProductDocument {
     private String name;
 
     @Field(type = FieldType.Float)
-    private Double price;
+    private BigDecimal price;
 
     @Field(type = FieldType.Text)
     private String description;
@@ -49,11 +51,11 @@ public class ProductDocument {
         this.name = name;
     }
 
-    public Double getPrice() {
+    public BigDecimal getPrice() {
         return price;
     }
 
-    public void setPrice(Double price) {
+    public void setPrice(BigDecimal price) {
         this.price = price;
     }
 
