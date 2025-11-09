@@ -1,5 +1,5 @@
 ### parameters
-### Criar produto no Microserviço A
+### Criar produto no Microserviço A - Create product in Microservice A
 POST http://localhost:8080/products
 Content-Type: application/json
 
@@ -16,7 +16,7 @@ Content-Type: application/json
 {
 "name":"Notebook Lenovo Ryzen",
 "description":"Memory 24GB",
-"price":4500
+"price":3800
 }
 
 ###
@@ -26,9 +26,23 @@ Content-Type: application/json
 {
 "name":"Monitor LCD 27",
 "description":"AOC 27 Polegadas 5ms",
-"price":989
+"price":989.80
 }
 
+###
+POST http://localhost:8080/products
+Content-Type: application/json
+
+{
+  "name":"Mouse Razer",
+  "description":"DeathAdder Elite",
+  "price":523.06
+}
+
+### Health Check Microserviço B
+GET http://localhost:8081/catalogo/suggest-health
+
+### Search Microserviço B
 ###
 GET http://localhost:8081/search/products/rtx
 
@@ -44,28 +58,34 @@ GET http://localhost:8081/search/products/lcd
 ###
 GET http://localhost:8081/search/products/minitor
 
-### listar todos
+### listar todos - liat all
 GET http://localhost:8081/search/products/listar-todos
 
 
 ### Catalogo
-### Busca por texto
+### Busca por texto - Search by text
 GET http://localhost:8081/catalogo/search?query=gamer
 
-### Busca com erro de digitação (fuzzy)
+### Busca com erro de digitação (fuzzy) - search with error of typing
 GET http://localhost:8081/catalogo/search?query=gammer
 
-### Erro na digitação feio, não encontrado, então sugesões
+### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
 GET http://localhost:8081/catalogo/search?query=notbuk
 
-### Faixa de preço
+### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
+GET http://localhost:8081/catalogo/search?query=minor
+
+### Faixa de preço - Price range
 GET http://localhost:8081/catalogo/search?minPrice=3000&maxPrice=6000
 
-### Ordenação
+### Ordenação - Sorting descending
 GET http://localhost:8081/catalogo/search?sort=price&direction=desc
 
-### Buscar tudo ao mesmo tempo
-GET http://localhost:8081/catalogo/search?query=gamer&minPrice=3000&maxPrice=6000&page=0&size=5&sort=price,asc
+### Buscar tudo ao mesmo tempo - Search all at the same time
+GET http://localhost:8081/catalogo/search?query=noti&minPrice=3000&maxPrice=6000&page=0&size=5&sort=price,asc
+
+### Buscar todos - List all
+GET http://localhost:8081/catalogo/search
 
 ###?sort=price,asc
 ###?sort=price,desc
