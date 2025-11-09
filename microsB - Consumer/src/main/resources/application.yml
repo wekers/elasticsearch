@@ -11,11 +11,28 @@ spring:
         acknowledge-mode: MANUAL
         default-requeue-rejected: false
         retry:
-          enabled: true
-          max-attempts: 5
-          initial-interval: 2000ms
-          multiplier: 2.0
-          max-interval: 30000ms
+          enabled: false # Desabilita retry automático, usamos manual
+  thymeleaf:
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
+
+app:
+  rabbitmq:
+    queues:
+      main: "products.queue"
+      retry5s: "products.retry.5s.queue"
+      dead: "products.dead.queue"
+    exchanges:
+      main: "products.exchange"
+      dlx: "products.dlx"
+    routing-keys:
+      created: "products.created"
+      retry5s: "products.retry.5s"
+      dead: "products.dead"
+    retry:
+      max-attempts: 3
+      retry-delay-ms: 5000
 
 server:
   port: 8081
