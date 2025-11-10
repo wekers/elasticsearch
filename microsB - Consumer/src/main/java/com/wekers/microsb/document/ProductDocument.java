@@ -19,7 +19,7 @@ public class ProductDocument {
     @Field(type = FieldType.Text, analyzer = "autocomplete_analyzer", searchAnalyzer = "standard")
     private String name;
 
-    @Field(type = FieldType.Float)
+    @Field(type = FieldType.Double)
     private BigDecimal price;
 
     @Field(type = FieldType.Text)
@@ -31,7 +31,15 @@ public class ProductDocument {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String correctedQuery;
 
+    public ProductDocument() {}
 
+    public ProductDocument(String id, String name, BigDecimal price, String description) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+        this.description = description;
+        this.name_spell = name;
+    }
 
     // Getters and setters
 
@@ -49,6 +57,10 @@ public class ProductDocument {
 
     public void setName(String name) {
         this.name = name;
+        // SEMPRE mantém name_spell sincronizado
+        if (this.name_spell == null) {
+            this.name_spell = name;
+        }
     }
 
     public BigDecimal getPrice() {
