@@ -7,11 +7,14 @@
         "analyzer": {
           "autocomplete_analyzer": {
             "tokenizer": "autocomplete_tokenizer",
-            "filter": ["lowercase"]
+            "filter": ["lowercase", "asciifolding"]
           },
           "autocomplete_search_analyzer": {
-            "tokenizer": "standard",
-            "filter": ["lowercase"]
+            "tokenizer": "autocomplete_tokenizer",
+            "filter": ["lowercase", "asciifolding"]
+          },
+          "standard": {
+            "type": "standard"
           }
         },
         "tokenizer": {
@@ -19,7 +22,7 @@
             "type": "edge_ngram",
             "min_gram": 2,
             "max_gram": 20,
-            "token_chars": ["letter", "digit"]
+            "token_chars": ["letter", "digit", "whitespace"]
           }
         }
       }
@@ -28,9 +31,20 @@
   "mappings": {
     "properties": {
       "id": { "type": "keyword" },
-      "name": { "type": "text", "analyzer": "autocomplete_analyzer", "search_analyzer": "autocomplete_search_analyzer" },
-      "name_spell": { "type": "text" },
-      "price": { "type": "float" },
+      "name": {
+        "type": "text",
+        "analyzer": "autocomplete_analyzer",
+        "search_analyzer": "autocomplete_search_analyzer",
+        "fields": {
+          "keyword": { "type": "keyword" },
+          "standard": { "type": "text", "analyzer": "standard" }
+        }
+      },
+      "name_spell": {
+        "type": "text",
+        "analyzer": "standard"
+      },
+      "price": { "type": "double" },
       "description": { "type": "text" },
       "correctedQuery": { "type": "keyword", "index": false }
     }
