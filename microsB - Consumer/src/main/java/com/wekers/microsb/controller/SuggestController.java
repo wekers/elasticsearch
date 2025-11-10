@@ -22,4 +22,21 @@ public class SuggestController {
     public List<String> suggest(@RequestParam String prefix) {
         return service.suggest(prefix);
     }
+
+    // Endpoint alternativo para debug
+    @GetMapping("/suggest-wildcard")
+    public List<String> suggestWildcard(@RequestParam String prefix) {
+        return service.suggestWildcard(prefix);
+    }
+
+    // Endpoint de health check
+    @GetMapping("/suggest-health")
+    public String healthCheck() {
+        try {
+            var result = service.suggest("test");
+            return "✅ Autocomplete service is working. Test returned: " + result.size() + " results";
+        } catch (Exception e) {
+            return "❌ Autocomplete service error: " + e.getMessage();
+        }
+    }
 }
