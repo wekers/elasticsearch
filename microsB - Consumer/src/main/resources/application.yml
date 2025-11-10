@@ -34,5 +34,35 @@ app:
       max-attempts: 3
       retry-delay-ms: 5000
 
+# Config of Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,beans
+    access:
+      default: read_only
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    info:
+      access: read_only
+    metrics:
+      access: read_only
+    env:
+      access: read_only
+    beans:
+      access: read_only
+
+# Health check of RabbitMQ
+  health:
+    rabbit:
+      enabled: true
+    diskspace:
+      enabled: true
+    ping:
+      enabled: true
+
 server:
   port: 8081
