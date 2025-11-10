@@ -10,11 +10,8 @@ import co.elastic.clients.elasticsearch._types.query_dsl.RangeQuery;
 import co.elastic.clients.json.JsonData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wekers.microsb.document.ProductDocument;
-
 import com.wekers.microsb.dto.CatalogSearchResponse;
-import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.Request;
-import org.elasticsearch.client.Response;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -25,13 +22,10 @@ import org.springframework.data.elasticsearch.core.query.HighlightQuery;
 import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightParameters;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class CatalogSearchService {
@@ -63,7 +57,7 @@ public class CatalogSearchService {
             must.add(Query.of(q -> q.multiMatch(
                     MultiMatchQuery.of(m -> m
                             .query(query)
-                            .fields("name^3", "description^1")
+                            .fields("name.standard^3", "description^1")
                             .fuzziness("AUTO")
                     )
             )));
@@ -170,43 +164,74 @@ public class CatalogSearchService {
 
     }
 
+    private List<String> suggestVocabulary() {
+        try {
+            var query = NativeQuery.builder()
+                    .withQuery(Query.of(q -> q.exists(e -> e.field("name"))))
+                    .withPageable(PageRequest.of(0, 50)) // ✅ Aumentei para 50
+                    .withFields("name") // ✅ Busca apenas o campo name
+                    .build();
+
+            var hits = operations.search(query, ProductDocument.class);
+
+            return hits.getSearchHits()
+                    .stream()
+                    .map(hit -> hit.getContent().getName())
+                    .filter(name -> name != null && !name.trim().isEmpty())
+                    .distinct()
+                    .sorted()
+                    .limit(20) // Limita para 20 sugestões
+                    .toList();
+
+        } catch (Exception e) {
+            System.err.println("Erro no suggestVocabulary: " + e.getMessage());
+            return List.of();
+        }
+    }
+
     private String correctQuery(String originalQuery) {
         if (originalQuery == null || originalQuery.isBlank()) return originalQuery;
 
         try {
-
             var transport = (co.elastic.clients.transport.rest_client.RestClientTransport) esClient._transport();
-            RestClient low = transport.restClient();
+            var low = transport.restClient();
 
+            // JSON corrigido para spellcheck
             String json = """
         {
-          "size": 0,
           "suggest": {
-            "spellcheck": {
-              "text": "%s",
-              "term": {
+            "text": "%s",
+            "simple_phrase": {
+              "phrase": {
                 "field": "name_spell",
-                "suggest_mode": "always",
-                "max_edits": 2
+                "size": 1,
+                "gram_size": 2,
+                "direct_generator": [{
+                  "field": "name_spell",
+                  "suggest_mode": "popular"
+                }],
+                "highlight": {
+                  "pre_tag": "<em>",
+                  "post_tag": "</em>"
+                }
               }
             }
           }
         }
-        """.formatted(originalQuery);
+        """.formatted(originalQuery.replace("\"", "\\\""));
 
-            Request request = new Request("POST", "/products/_search");
+            var request = new Request("POST", "/products/_search");
             request.setJsonEntity(json);
 
-            Response response = low.performRequest(request);
-
+            var response = low.performRequest(request);
             var root = mapper.readTree(response.getEntity().getContent());
-            var suggest = root.path("suggest").path("spellcheck");
-            if (!suggest.isArray()) return originalQuery;
 
-            for (var entry : suggest) {
-                for (var opt : entry.path("options")) {
-                    var suggestion = opt.path("text").asText();
-                    if (!suggestion.isBlank()) {
+            var suggest = root.path("suggest").path("simple_phrase");
+            if (suggest.isArray() && suggest.size() > 0) {
+                var options = suggest.get(0).path("options");
+                if (options.isArray() && options.size() > 0) {
+                    var suggestion = options.get(0).path("text").asText();
+                    if (!suggestion.isBlank() && !suggestion.equalsIgnoreCase(originalQuery)) {
                         return suggestion;
                     }
                 }
@@ -215,26 +240,9 @@ public class CatalogSearchService {
             return originalQuery;
 
         } catch (Exception e) {
+            System.err.println("Erro no correctQuery: " + e.getMessage());
             return originalQuery;
         }
-    }
-
-    private List<String> suggestVocabulary() {
-        var hits = operations.search(
-                NativeQuery.builder()
-                        .withFields("name_spell")
-                        .withPageable(PageRequest.of(0, 100))
-                        .build(),
-                ProductDocument.class
-        );
-
-        return hits.getSearchHits().stream()
-                .map(h -> h.getContent().getNameSpell())
-                .filter(s -> s != null)
-                .flatMap(s -> List.of(s.split("\\s+")).stream())
-                .distinct()
-                .sorted()
-                .toList();
     }
 
 
