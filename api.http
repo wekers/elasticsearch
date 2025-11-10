@@ -1,5 +1,8 @@
+##################################################################################
+# Microservice A - Create Products
 ### parameters
 ### Criar produto no Microserviço A - Create product in Microservice A
+
 POST http://localhost:8080/products
 Content-Type: application/json
 
@@ -39,30 +42,40 @@ Content-Type: application/json
   "price":523.06
 }
 
-### Health Check Microserviço B
+
+##################################################################################
+# Microservice B - Health Check
+### Health Check Microservice B
 GET http://localhost:8081/catalogo/suggest-health
 
-### Search Microserviço B
-###
+
+#################################################################################
+# Basic Search Microservice B
+### Basic Search
+
+### Busca por texto - Search by text
 GET http://localhost:8081/search/products/rtx
 
-###
+### Busca com erro de digitação (fuzzy) - search with error of typing
 GET http://localhost:8081/search/products/gammer
 
-###
+### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
 GET http://localhost:8081/search/products/notibook
 
 ###
 GET http://localhost:8081/search/products/lcd
 
-###
+### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
 GET http://localhost:8081/search/products/minitor
 
-### listar todos - liat all
+### listar todos - list all
 GET http://localhost:8081/search/products/listar-todos
 
 
-### Catalogo
+
+################################################################################
+# Advanced Search Microservice B
+### Catalogo - Catalog Complete Search with Pagination and Suggestions
 ### Busca por texto - Search by text
 GET http://localhost:8081/catalogo/search?query=gamer
 
@@ -96,4 +109,3 @@ GET http://localhost:8081/catalogo/search
 # Autocomplete
 GET http://localhost:8081/catalogo/suggest?prefix=no
 
-###
