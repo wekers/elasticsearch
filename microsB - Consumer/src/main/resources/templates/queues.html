@@ -1,126 +1,366 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-br">
 <head>
-    <title>RabbitMQ Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8"/>
+    <title>RabbitMQ Live Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <style>
-        pre {
-            background: #1e1e1e;
-            color: #dcdcdc;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 0.9em;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        :root {
+            --bg: #1e2328;
+            --panel: #2b3137;
+            --text: #e6edf3;
+            --muted: #9aa4af;
+            --ok: #f5c518;
+            --bad: #d73a49;
+            --card: #111418;
+            --btn: #2d333b;
+            --btn-hover: #3a424b;
+            --live-indicator: #10b981;
         }
-        .queue-card { transition: transform 0.2s; }
-        .queue-card:hover { transform: translateY(-2px); }
-        .badge { font-size: 0.8em; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 24px; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: var(--bg); color: var(--text);
+        }
+        .title {
+            font-size: 28px; font-weight: 700; margin: 0 0 20px;
+            display: flex; gap: 10px; align-items: center;
+        }
+        .live-indicator {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 14px; color: var(--live-indicator);
+        }
+        .live-dot {
+            width: 8px; height: 8px; background: var(--live-indicator);
+            border-radius: 50%; animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+        .container { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
+        .section { background: var(--panel); border-radius: 10px; padding: 12px 14px; }
+        .section-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px;
+        }
+        .section h2 {
+            font-size: 14px; font-weight: 700; letter-spacing: .4px;
+            text-transform: uppercase; opacity: .9; margin: 0;
+        }
+        .queue-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .queue-name {
+            background: #4b5563; color: #fff; border-radius: 8px;
+            padding: 10px 12px; font-size: 13px; flex-grow: 1;
+        }
+        .queue-name.ok { background: #f59e0b; color: #1e2328; }
+        .queue-name.bad { background: #ef4444; }
+        .message-count {
+            background: #374151; color: #fff; border-radius: 6px;
+            padding: 6px 10px; font-size: 12px; font-weight: bold;
+            margin-left: 10px; min-width: 60px; text-align: center;
+        }
+        .message-count.high { background: #dc2626; }
+        .message-count.medium { background: #d97706; }
+        .message-count.low { background: #059669; }
+
+        .msg-card {
+            background: var(--card); border-radius: 8px; padding: 10px;
+            margin: 10px 0; border: 1px solid #2b3137;
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .msg-pre {
+            margin: 0; white-space: pre-wrap; word-break: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px; background: #0b0f14; color: #e5e7eb; padding: 10px; border-radius: 6px;
+            max-height: 200px; overflow-y: auto;
+        }
+
+        .actions { margin-top: 8px; display: flex; gap: 8px; }
+        .btn {
+            appearance: none; border: 0; background: var(--btn); color: var(--text); border-radius: 6px;
+            padding: 8px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s;
+        }
+        .btn:hover { background: var(--btn-hover); }
+        .btn.ok { background: #0ea5e9; }
+        .btn.ok:hover { background: #0284c7; }
+        .btn.danger { background: #ef4444; }
+        .btn.danger:hover { background: #dc2626; }
+
+        .empty { color: var(--muted); font-size: 13px; margin: 6px 0 12px; text-align: center; padding: 20px; }
+
+        .controls {
+            display: flex; gap: 10px; margin-bottom: 20px; align-items: center;
+        }
+        .control-btn {
+            background: #374151; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 13px;
+        }
+        .control-btn:hover { background: #4b5563; }
+        .auto-refresh { display: flex; align-items: center; gap: 8px; }
+        .auto-refresh label { font-size: 13px; color: var(--muted); }
     </style>
 </head>
-<body class="bg-dark text-light p-4">
-
+<body>
 <div class="container">
-    <h1 class="mb-4">📦 RabbitMQ Dashboard</h1>
-
-    <!-- Alert Messages -->
-    <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
-        <span th:text="${success}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
-        <span th:text="${error}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-
-    <div class="row">
-        <!-- MAIN QUEUE -->
-        <div class="col-md-4 mb-4">
-            <div class="card queue-card bg-secondary">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>🟢 Fila Principal</span>
-                    <span class="badge bg-light text-dark" th:text="'Count: ' + ${mainCount}"></span>
-                </div>
-                <div class="card-body">
-                    <small class="text-light" th:text="${mainQueue}"></small>
-                    <div th:each="msg, stat : ${mainMessages}">
-                        <!-- Use utext para não escapar -->
-                        <pre th:utext="${msg}"></pre>
-                        <small class="text-muted" th:text="'Message ' + (stat.index + 1)"></small>
-                        <hr th:if="${!stat.last}">
-                    </div>
-                    <div th:if="${#lists.isEmpty(mainMessages)}" class="text-center text-muted">
-                        No messages
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- RETRY QUEUE -->
-        <div class="col-md-4 mb-4">
-            <div class="card queue-card bg-warning text-dark">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>🟡 Fila Retry</span>
-                    <span class="badge bg-dark text-light" th:text="'Count: ' + ${retryCount}"></span>
-                </div>
-                <div class="card-body">
-                    <small th:text="${retryQueue}"></small>
-                    <div th:each="msg, stat : ${retryMessages}">
-                        <!-- Use utext para não escapar -->
-                        <pre th:utext="${msg}"></pre>
-                        <small class="text-muted" th:text="'Message ' + (stat.index + 1)"></small>
-                        <hr th:if="${!stat.last}">
-                    </div>
-                    <div th:if="${#lists.isEmpty(retryMessages)}" class="text-center text-muted">
-                        No messages
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- DEAD LETTER QUEUE -->
-        <div class="col-md-4 mb-4">
-            <div class="card queue-card bg-danger">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>🔴 Dead Letter Queue</span>
-                    <span class="badge bg-light text-dark" th:text="'Count: ' + ${deadCount}"></span>
-                </div>
-                <div class="card-body">
-                    <small class="text-light" th:text="${deadQueue}"></small>
-
-                    <!-- Botão para deletar primeira mensagem -->
-                    <form method="post" action="/queues/delete" class="mb-3">
-                        <button class="btn btn-sm btn-warning w-100" type="submit"
-                                th:disabled="${deadCount == 0}">
-                            🗑 Delete First Message
-                        </button>
-                    </form>
-
-                    <!-- Lista de mensagens com opção de reprocessar -->
-                    <div th:each="msg, stat : ${deadMessages}">
-                        <form method="post" action="/queues/reprocess" class="mb-3">
-                            <!-- Mantém th:text no hidden para o valor ser escapado corretamente -->
-                            <input type="hidden" name="body" th:value="${msg}"/>
-                            <!-- Use utext para exibição -->
-                            <pre th:utext="${msg}"></pre>
-                            <button class="btn btn-sm btn-light w-100" type="submit">
-                                ♻ Reprocessar
-                            </button>
-                        </form>
-                        <hr th:if="${!stat.last}">
-                    </div>
-
-                    <div th:if="${#lists.isEmpty(deadMessages)}" class="text-center text-muted">
-                        No messages
-                    </div>
-                </div>
-            </div>
+    <div class="title">
+        🐇 RabbitMQ Dashboard
+        <div class="live-indicator">
+            <div class="live-dot"></div>
+            <span>LIVE</span>
         </div>
     </div>
+
+    <!-- Controles -->
+    <div class="controls">
+        <button class="control-btn" onclick="refreshAll()">🔄 Atualizar Agora</button>
+        <div class="auto-refresh">
+            <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()">
+            <label for="autoRefresh">Atualização automática (5s)</label>
+        </div>
+        <div style="color: var(--muted); font-size: 13px;">
+            Última atualização: <span id="lastUpdate">-</span>
+        </div>
+    </div>
+
+    <!-- Fila Principal -->
+    <section class="section" id="mainQueueSection">
+        <div class="section-header">
+            <h2>Fila Principal</h2>
+            <div class="message-count" id="mainCount">0</div>
+        </div>
+        <div class="queue-name" th:text="${mainQueue}">products.queue</div>
+        <div id="mainMessages">
+            <!-- Será populado via JavaScript -->
+        </div>
+    </section>
+
+    <!-- Fila Retry -->
+    <section class="section" id="retryQueueSection">
+        <div class="section-header">
+            <h2>Fila Retry</h2>
+            <div class="message-count" id="retryCount">0</div>
+        </div>
+        <div class="queue-name ok" th:text="${retryQueue}">products.retry.5s.queue</div>
+        <div id="retryMessages">
+            <!-- Será populado via JavaScript -->
+        </div>
+    </section>
+
+    <!-- Dead Letter Queue -->
+    <section class="section" id="deadQueueSection">
+        <div class="section-header">
+            <h2>Dead Letter Queue</h2>
+            <div class="message-count" id="deadCount">0</div>
+        </div>
+        <div class="queue-name bad" th:text="${deadQueue}">products.dead.queue</div>
+        <div id="deadMessages">
+            <!-- Será populado via JavaScript -->
+        </div>
+    </section>
+
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let autoRefreshInterval = null;
+    const AUTO_REFRESH_INTERVAL = 5000; // 5 segundos
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshAll();
+        startAutoRefresh();
+    });
+
+    // ✅ Atualiza tudo
+    async function refreshAll() {
+        try {
+            const response = await fetch('/queues/api/all-messages');
+            const data = await response.json();
+
+            updateQueueSection('main', data.mainMessages, data.mainCount);
+            updateQueueSection('retry', data.retryMessages, data.retryCount);
+            updateQueueSection('dead', data.deadMessages, data.deadCount);
+
+            updateLastUpdateTime();
+        } catch (error) {
+            console.error('Erro ao atualizar:', error);
+        }
+    }
+
+    // ✅ Atualiza uma seção específica
+    // Snapshot anterior para detectar mudanças
+    let lastSnapshot = { main: '', retry: '', dead: '' };
+
+    function updateQueueSection(queueType, messages, count) {
+        const container = document.getElementById(`${queueType}Messages`);
+        const countElement = document.getElementById(`${queueType}Count`);
+
+        // 🔁 Atualiza contador e cor
+        countElement.textContent = count;
+        updateCountStyle(countElement, count);
+
+        // 🔎 Converte lista em string JSON para comparar
+        const snapshot = JSON.stringify(messages);
+
+        // 🚫 Se não mudou desde a última atualização, não repinta
+        if (lastSnapshot[queueType] === snapshot) {
+            return;
+        }
+        lastSnapshot[queueType] = snapshot;
+
+        // 🔄 Renderiza novamente apenas se o conteúdo mudou
+        container.innerHTML = '';
+        if (!messages || messages.length === 0) {
+            container.innerHTML = '<div class="empty">Sem mensagens.</div>';
+            return;
+        }
+
+        messages.forEach(message => {
+            const card = createMessageCard(message, queueType);
+            container.appendChild(card);
+        });
+    }
+
+
+    // ✅ Estiliza o contador baseado na quantidade
+    function updateCountStyle(element, count) {
+        element.classList.remove('high', 'medium', 'low');
+        if (count > 10) element.classList.add('high');
+        else if (count > 5) element.classList.add('medium');
+        else if (count > 0) element.classList.add('low');
+    }
+
+    // ✅ Cria card de mensagem
+    function createMessageCard(message, queueType) {
+        const card = document.createElement('div');
+        card.className = 'msg-card';
+
+        const pre = document.createElement('pre');
+        pre.className = 'msg-pre';
+        pre.textContent = message;
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        // Botão Reprocessar
+        const reprocessForm = document.createElement('form');
+        reprocessForm.action = '/queues/reprocess';
+        reprocessForm.method = 'post';
+
+        const reprocessInput = document.createElement('input');
+        reprocessInput.type = 'hidden';
+        reprocessInput.name = 'body';
+        reprocessInput.value = message;
+
+        const reprocessButton = document.createElement('button');
+        reprocessButton.type = 'submit';
+        reprocessButton.className = 'btn ok';
+        reprocessButton.textContent = '⟳ Reprocessar';
+
+        reprocessForm.appendChild(reprocessInput);
+        reprocessForm.appendChild(reprocessButton);
+
+        // Botão Excluir (apenas para DLQ)
+        if (queueType === 'dead') {
+            const deleteForm = document.createElement('form');
+            deleteForm.action = '/queues/delete';
+            deleteForm.method = 'post';
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'submit';
+            deleteButton.className = 'btn danger';
+            deleteButton.textContent = '🗑 Excluir (1ª mensagem)';
+            deleteForm.appendChild(deleteButton);
+
+            // 🧠 Só adiciona o botão se for o primeiro card
+            if (document.getElementById(`${queueType}Messages`).children.length === 0) {
+                actions.appendChild(deleteForm);
+            }
+        }
+
+
+        actions.appendChild(reprocessForm);
+
+        card.appendChild(pre);
+        card.appendChild(actions);
+
+        return card;
+    }
+
+    // ✅ Atualiza timestamp da última atualização
+    function updateLastUpdateTime() {
+        const now = new Date();
+        document.getElementById('lastUpdate').textContent =
+            now.toLocaleTimeString('pt-BR');
+    }
+
+    // ✅ Controle de auto-refresh
+    function startAutoRefresh() {
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = setInterval(refreshAll, AUTO_REFRESH_INTERVAL);
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    function toggleAutoRefresh() {
+        const checkbox = document.getElementById('autoRefresh');
+        if (checkbox.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    }
+
+    // ✅ Atualização individual por fila (mais eficiente)
+    async function refreshQueue(queueName) {
+        try {
+            const response = await fetch(`/queues/api/messages/${queueName}`);
+            const data = await response.json();
+
+            let queueType;
+            if (queueName.includes('main')) queueType = 'main';
+            else if (queueName.includes('retry')) queueType = 'retry';
+            else if (queueName.includes('dead')) queueType = 'dead';
+            else return;
+
+            updateQueueSection(queueType, data.messages, data.messages.length);
+        } catch (error) {
+            console.error(`Erro ao atualizar ${queueName}:`, error);
+        }
+    }
+
+    // ✅ Atualiza apenas os contadores (mais leve)
+    async function refreshCounters() {
+        try {
+            const response = await fetch('/queues/api/status');
+            const data = await response.json();
+
+            document.getElementById('mainCount').textContent = data.mainCount;
+            document.getElementById('retryCount').textContent = data.retryCount;
+            document.getElementById('deadCount').textContent = data.deadCount;
+
+            updateCountStyle(document.getElementById('mainCount'), data.mainCount);
+            updateCountStyle(document.getElementById('retryCount'), data.retryCount);
+            updateCountStyle(document.getElementById('deadCount'), data.deadCount);
+
+            updateLastUpdateTime();
+        } catch (error) {
+            console.error('Erro ao atualizar contadores:', error);
+        }
+    }
+</script>
 </body>
 </html>
