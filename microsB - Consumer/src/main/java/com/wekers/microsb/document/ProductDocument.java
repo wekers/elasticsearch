@@ -9,7 +9,7 @@ import org.springframework.data.elasticsearch.annotations.Setting;
 
 import java.math.BigDecimal;
 
-@Document(indexName = "products")
+@Document(indexName = "products_write")
 @Setting(settingPath = "/elasticsearch/product-settings.json")
 public class ProductDocument {
 
