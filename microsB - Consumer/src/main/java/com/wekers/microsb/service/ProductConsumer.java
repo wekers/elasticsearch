@@ -1,5 +1,6 @@
 package com.wekers.microsb.service;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.wekers.microsb.config.RabbitMQConstants;
@@ -13,9 +14,11 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -49,13 +52,15 @@ public class ProductConsumer {
             // Tenta converter usando o messageConverter
             Object converted = messageConverter.fromMessage(message);
 
-            if (converted instanceof ProductDocument) {
-                return (ProductDocument) converted;
-            } else if (converted instanceof String) {
-                // Se chegou como String, tenta parsear manualmente
-                String jsonString = (String) converted;
+            if (converted instanceof ProductDocument doc) {
+                return doc;
+            } else if (converted instanceof String jsonString) {
                 log.debug("Converting from String: {}", jsonString);
                 return objectMapper.readValue(jsonString, ProductDocument.class);
+            } else if (converted instanceof Map<?, ?> map) {
+                log.debug("Converting from Map: {}", map);
+                // Converte o Map em ProductDocument
+                return objectMapper.convertValue(map, ProductDocument.class);
             } else {
                 throw new IllegalArgumentException("Unsupported message type: " + converted.getClass());
             }
@@ -68,12 +73,19 @@ public class ProductConsumer {
     }
 
     private void handleProcessingFailure(Message message, Channel channel, long deliveryTag, Exception ex) throws IOException {
-        MessageProperties originalProperties = message.getMessageProperties();
-        int retryCount = (int) originalProperties.getHeaders()
-                .getOrDefault(RabbitMQConstants.RETRY_HEADER, 0);
+        MessageProperties props = message.getMessageProperties();
+        int retryCount = (int) props.getHeaders().getOrDefault(RabbitMQConstants.RETRY_HEADER, 0);
+        boolean fatal = isFatalError(ex);
 
-        log.warn("Retry count: {}/{}", retryCount, properties.getRetry().getMaxAttempts());
+        // 🚨 JSON inválido -> DLQ imediata
+        if (fatal) {
+            log.warn("🚫 Fatal message conversion error → sending directly to DLQ");
+            sendToDeadLetter(message);
+            channel.basicAck(deliveryTag, false);
+            return;
+        }
 
+        // ⚙️ Retry controlado
         if (retryCount < properties.getRetry().getMaxAttempts()) {
             sendToRetry(message, retryCount);
             log.warn("🔄 Message sent to retry queue, attempt: {}", retryCount + 1);
@@ -85,25 +97,34 @@ public class ProductConsumer {
         channel.basicAck(deliveryTag, false);
     }
 
-    private void sendToRetry(Message originalMessage, int currentRetryCount) {
-        MessageProperties retryProperties = createMessageProperties(originalMessage);
-        retryProperties.setHeader(RabbitMQConstants.RETRY_HEADER, currentRetryCount + 1);
+    private boolean isFatalError(Exception ex) {
+        Throwable cause = ex.getCause();
+        return ex instanceof MessageConversionException
+                || ex instanceof JsonParseException
+                || (cause != null && cause instanceof JsonParseException)
+                || (cause != null && cause instanceof MessageConversionException);
+    }
 
-        Message retryMessage = new Message(originalMessage.getBody(), retryProperties);
-        rabbitTemplate.send(properties.getExchanges().getDlx(),
+    private void sendToRetry(Message originalMessage, int currentRetryCount) {
+        MessageProperties retryProps = createMessageProperties(originalMessage);
+        retryProps.setHeader(RabbitMQConstants.RETRY_HEADER, currentRetryCount + 1);
+        Message retryMessage = new Message(originalMessage.getBody(), retryProps);
+        rabbitTemplate.send(
+                properties.getExchanges().getDlx(),
                 properties.getRoutingKeys().getRetry5s(),
-                retryMessage);
+                retryMessage
+        );
     }
 
     private void sendToDeadLetter(Message originalMessage) {
-        MessageProperties deadLetterProperties = createMessageProperties(originalMessage);
-        // Remove o header de retry para a DLQ
-        deadLetterProperties.getHeaders().remove(RabbitMQConstants.RETRY_HEADER);
-
-        Message deadLetterMessage = new Message(originalMessage.getBody(), deadLetterProperties);
-        rabbitTemplate.send(properties.getExchanges().getDlx(),
+        MessageProperties deadProps = createMessageProperties(originalMessage);
+        deadProps.getHeaders().remove(RabbitMQConstants.RETRY_HEADER);
+        Message deadMessage = new Message(originalMessage.getBody(), deadProps);
+        rabbitTemplate.send(
+                properties.getExchanges().getDlx(),
                 properties.getRoutingKeys().getDead(),
-                deadLetterMessage);
+                deadMessage
+        );
     }
 
     private MessageProperties createMessageProperties(Message originalMessage) {
