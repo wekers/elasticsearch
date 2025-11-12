@@ -16,6 +16,12 @@ spring:
     enabled: true
     prefix: classpath:/templates/
     suffix: .html
+  # Elasticsearch configuration
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
+
 
 app:
   rabbitmq:
