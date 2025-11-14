@@ -24,6 +24,27 @@ spring:
     password: guest
     publisher-confirm-type: correlated # Habilita confirmações (ConfirmCallback)
     publisher-returns: true # Habilita retorno de mensagens não roteadas (ReturnsCallback)
+app:
+  rabbitmq:
+    queues:
+      main: "products.queue"
+      retry5s: "products.retry.5s.queue"
+      dead: "products.dead.queue"
+      deleted: "products.deleted.queue"
+
+    exchanges:
+      main: "products.exchange"
+      dlx: "products.dlx"
+
+    routing-keys:
+      created: "products.created"
+      retry5s: "products.retry.5s"
+      dead: "products.dead"
+      deleted: "products.deleted"
+
+    retry:
+      max-attempts: 3
+      retry-delay-ms: 5000
 
 
 server:
