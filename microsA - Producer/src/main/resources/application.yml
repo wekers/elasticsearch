@@ -38,6 +38,7 @@ app:
 
     routing-keys:
       created: "products.created"
+      updated: "products.updated"
       retry5s: "products.retry.5s"
       dead: "products.dead"
       deleted: "products.deleted"
