@@ -31,24 +31,27 @@ public class QueueDashboardController {
     private final RabbitMQProperties properties;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // Página HTML
+    // HTML PAGE
     @GetMapping
     public String dashboard(Model model) {
         populateDashboardModel(model);
         return "queues";
     }
 
-    // ---- REST: status agregado (contadores)
+    // STATUS ONLY
     @GetMapping(value = "/api/status", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<QueueStatusResponse> getQueueStatus() {
         var body = new QueueStatusResponse(
-                countMain(), countRetry(), countDead()
+                countMain(),
+                countRetry(),
+                countDead(),
+                countDeleted()
         );
         return noCache(body);
     }
 
-    // ---- REST: mensagens por fila (com validação)
+    // MESSAGES PER QUEUE
     @GetMapping(value = "/api/messages/{kind}", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<QueueMessagesResponse> getQueueMessages(@PathVariable String kind) {
@@ -59,32 +62,40 @@ public class QueueDashboardController {
         return noCache(body);
     }
 
-    // ---- REST: tudo (contadores + mensagens)
+    // ALL MESSAGES (MAIN + RETRY + DEAD + DELETED)
     @GetMapping(value = "/api/all-messages", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<AllQueuesResponse> getAllMessages() {
-        List<String> main = queueService.peek(properties.getQueues().getMain(), 10).stream().map(this::normalizeJsonOrKeep).toList();
-        List<String> retry = queueService.peek(properties.getQueues().getRetry5s(), 10).stream().map(this::normalizeJsonOrKeep).toList();
-        List<String> dead = queueService.peek(properties.getQueues().getDead(), 10).stream().map(this::normalizeJsonOrKeep).toList();
+
+        List<String> main    = queueService.peek(properties.getQueues().getMain(), 10)     .stream().map(this::normalizeJsonOrKeep).toList();
+        List<String> retry   = queueService.peek(properties.getQueues().getRetry5s(), 10)  .stream().map(this::normalizeJsonOrKeep).toList();
+        List<String> dead    = queueService.peek(properties.getQueues().getDead(), 10)     .stream().map(this::normalizeJsonOrKeep).toList();
+        List<String> deleted = queueService.peek(properties.getQueues().getDeleted(), 10)  .stream().map(this::normalizeJsonOrKeep).toList();
 
         var body = new AllQueuesResponse(
-                main, retry, dead,
-                countMain(), countRetry(), countDead()
+                main, retry, dead, deleted,
+                countMain(), countRetry(), countDead(), countDeleted()
         );
+
         return noCache(body);
     }
 
-    // Reprocessar (recebe JSON e republica como objeto)
+    // REPROCESS
     @PostMapping("/reprocess")
     public String reprocess(@RequestParam("body") String messageBody, RedirectAttributes ra) {
         try {
             String json = normalizeJsonOrKeep(messageBody);
-            JsonNode node = mapper.readTree(json); // valida JSON
+
+            // valida JSON
+            mapper.readTree(json);
+
+            // envia como String pura
             rabbitTemplate.convertAndSend(
                     properties.getExchanges().getMain(),
                     properties.getRoutingKeys().getCreated(),
-                    mapper.convertValue(node, Map.class) // ou ProductDocument.class se quiser tipar
+                    json
             );
+
             ra.addFlashAttribute("success", "Message reprocessed successfully");
         } catch (Exception e) {
             log.error("Error reprocessing message", e);
@@ -93,67 +104,66 @@ public class QueueDashboardController {
         return "redirect:/queues";
     }
 
+
+    // DELETE FIRST MESSAGE FROM DEAD
     @PostMapping("/delete")
     public String deleteFromDeadQueue(RedirectAttributes ra) {
         boolean deleted = queueService.deleteFirstMessage(properties.getQueues().getDead());
         ra.addFlashAttribute(deleted ? "success" : "error",
-                deleted ? "Message deleted successfully" : "No message to delete");
+                deleted ? "Message deleted successfully"
+                        : "No message to delete");
         return "redirect:/queues";
     }
 
-    // ----------------- Helpers -----------------
-
+    // RESOLVE QUEUE NAME
     private String resolveQueue(String kind) {
-        // aceita aliases amigáveis
         return switch (kind) {
-            case "main"  -> properties.getQueues().getMain();
-            case "retry" -> properties.getQueues().getRetry5s();
-            case "dead"  -> properties.getQueues().getDead();
+            case "main"    -> properties.getQueues().getMain();
+            case "retry"   -> properties.getQueues().getRetry5s();
+            case "dead"    -> properties.getQueues().getDead();
+            case "deleted" -> properties.getQueues().getDeleted();
             default -> throw new IllegalArgumentException("Unknown queue kind: " + kind);
         };
     }
 
+    // POPULATE FIRST SCREEN
     private void populateDashboardModel(Model model) {
         model.addAttribute("mainQueue", properties.getQueues().getMain());
         model.addAttribute("retryQueue", properties.getQueues().getRetry5s());
         model.addAttribute("deadQueue", properties.getQueues().getDead());
+        model.addAttribute("deletedQueue", properties.getQueues().getDeleted());
+
         model.addAttribute("mainCount", countMain());
         model.addAttribute("retryCount", countRetry());
         model.addAttribute("deadCount", countDead());
-        // Primeiro paint já com dados
-        model.addAttribute("mainMessages", queueService.peek(properties.getQueues().getMain(), 10).stream().map(this::normalizeJsonOrKeep).toList());
-        model.addAttribute("retryMessages", queueService.peek(properties.getQueues().getRetry5s(), 10).stream().map(this::normalizeJsonOrKeep).toList());
-        model.addAttribute("deadMessages", queueService.peek(properties.getQueues().getDead(), 10).stream().map(this::normalizeJsonOrKeep).toList());
+        model.addAttribute("deletedCount", countDeleted());
+
+        model.addAttribute("mainMessages",    queueService.peek(properties.getQueues().getMain(), 10).stream().map(this::normalizeJsonOrKeep).toList());
+        model.addAttribute("retryMessages",   queueService.peek(properties.getQueues().getRetry5s(), 10).stream().map(this::normalizeJsonOrKeep).toList());
+        model.addAttribute("deadMessages",    queueService.peek(properties.getQueues().getDead(), 10).stream().map(this::normalizeJsonOrKeep).toList());
+        model.addAttribute("deletedMessages", queueService.peek(properties.getQueues().getDeleted(), 10).stream().map(this::normalizeJsonOrKeep).toList());
     }
 
-    // Tenta ler como JSON; se falhar, limpa escapes comuns; se ainda assim não der, devolve cru.
+    private long countMain()    { return queueService.getMessageCount(properties.getQueues().getMain()); }
+    private long countRetry()   { return queueService.getMessageCount(properties.getQueues().getRetry5s()); }
+    private long countDead()    { return queueService.getMessageCount(properties.getQueues().getDead()); }
+    private long countDeleted() { return queueService.getMessageCount(properties.getQueues().getDeleted()); }
+
     private String normalizeJsonOrKeep(String raw) {
         if (raw == null) return "";
         String s = raw.trim();
-
-        // 1) tira aspas externas repetidas
         s = s.replaceAll("^\"+", "").replaceAll("\"+$", "");
-
-        // 2) tenta desescapar \r \n \"
-        s = s
-                .replace("\\r", "")
-                .replace("\\n", "")
+        s = s.replace("\\r", "").replace("\\n", "")
                 .replace("\\\"", "\"")
                 .replace("\\\\", "\\");
 
-        // 3) tenta parsear como JSON; se conseguir, reserializa bonito
         try {
             var json = mapper.readTree(s.getBytes(StandardCharsets.UTF_8));
             return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
         } catch (Exception ignored) {
-            // não era JSON válido; retorna texto “limpo”
             return s;
         }
     }
-
-    private long countMain() { return queueService.getMessageCount(properties.getQueues().getMain()); }
-    private long countRetry() { return queueService.getMessageCount(properties.getQueues().getRetry5s()); }
-    private long countDead()  { return queueService.getMessageCount(properties.getQueues().getDead()); }
 
     private <T> ResponseEntity<T> noCache(T body) {
         return ResponseEntity.ok()
@@ -163,9 +173,16 @@ public class QueueDashboardController {
     }
 
     // DTOs
-    public record QueueStatusResponse(long mainCount, long retryCount, long deadCount) {}
+    public record QueueStatusResponse(long mainCount, long retryCount, long deadCount, long deletedCount) {}
     public record QueueMessagesResponse(String queueName, List<String> messages) {}
     public record AllQueuesResponse(
-            List<String> mainMessages, List<String> retryMessages, List<String> deadMessages,
-            long mainCount, long retryCount, long deadCount) {}
+            List<String> mainMessages,
+            List<String> retryMessages,
+            List<String> deadMessages,
+            List<String> deletedMessages,
+            long mainCount,
+            long retryCount,
+            long deadCount,
+            long deletedCount
+    ) {}
 }
