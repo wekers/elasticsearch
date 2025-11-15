@@ -25,11 +25,18 @@ public class ProductDocument {
     @Field(type = FieldType.Text)
     private String description;
 
+    // Campo para correção ortográfica + busca normalizada
     @Field(type = FieldType.Text, analyzer = "standard")
-    private String name_spell; // ← usado para correção ortográfica
+    private String nameSpell;
+
+    // Chave única para prevenir duplicidade (name + description)
+    @Field(type = FieldType.Keyword)
+    private String uniqueKey;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String correctedQuery;
+
+    // ---------- CONSTRUCTORS ----------
 
     public ProductDocument() {}
 
@@ -38,10 +45,13 @@ public class ProductDocument {
         this.name = name;
         this.price = price;
         this.description = description;
-        this.name_spell = name;
+
+        // Preenche os campos derivados
+        this.nameSpell = name;
+        this.uniqueKey = buildUniqueKey(name, description);
     }
 
-    // Getters and setters
+    // ---------- GETTERS / SETTERS ----------
 
     public String getId() {
         return id;
@@ -55,12 +65,13 @@ public class ProductDocument {
         return name;
     }
 
+    /**
+     * Sempre que o nome muda, refaz nameSpell e uniqueKey também.
+     */
     public void setName(String name) {
         this.name = name;
-        // SEMPRE mantém name_spell sincronizado
-        if (this.name_spell == null) {
-            this.name_spell = name;
-        }
+        this.nameSpell = name; // mantém sincronizado
+        this.rebuildUniqueKey();
     }
 
     public BigDecimal getPrice() {
@@ -75,8 +86,28 @@ public class ProductDocument {
         return description;
     }
 
+    /**
+     * Sempre que a descrição muda, refaz uniqueKey.
+     */
     public void setDescription(String description) {
         this.description = description;
+        rebuildUniqueKey();
+    }
+
+    public String getNameSpell() {
+        return nameSpell;
+    }
+
+    public void setNameSpell(String nameSpell) {
+        this.nameSpell = nameSpell;
+    }
+
+    public String getUniqueKey() {
+        return uniqueKey;
+    }
+
+    private void setUniqueKey(String uniqueKey) {
+        this.uniqueKey = uniqueKey;
     }
 
     public String getCorrectedQuery() {
@@ -87,11 +118,23 @@ public class ProductDocument {
         this.correctedQuery = correctedQuery;
     }
 
-    public String getNameSpell() {
-        return name_spell;
+    // ---------- HELPERS ----------
+
+    /**
+     * Gera chave única normalizada:
+     *   notebook lenovo ryzen::memory 24gb
+     */
+    private static String buildUniqueKey(String name, String desc) {
+        if (name == null) name = "";
+        if (desc == null) desc = "";
+
+        return (name.trim().toLowerCase() + "::" + desc.trim().toLowerCase()).trim();
     }
 
-    public void setNameSpell(String nameSpell) {
-        this.name_spell = nameSpell;
+    /**
+     * Recria a uniqueKey quando nome ou descrição mudam.
+     */
+    public void rebuildUniqueKey() {
+        this.uniqueKey = buildUniqueKey(this.name, this.description);
     }
 }
