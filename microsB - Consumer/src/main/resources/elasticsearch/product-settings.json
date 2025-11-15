@@ -4,6 +4,13 @@
       "number_of_shards": 1,
       "number_of_replicas": 0,
       "analysis": {
+        "normalizer": {
+          "lowercase_normalizer": {
+            "type": "custom",
+            "char_filter": [],
+            "filter": ["lowercase", "asciifolding"]
+          }
+        },
         "analyzer": {
           "autocomplete_analyzer": {
             "tokenizer": "autocomplete_tokenizer",
@@ -22,15 +29,26 @@
             "type": "edge_ngram",
             "min_gram": 2,
             "max_gram": 20,
-            "token_chars": ["letter", "digit", "whitespace"]
+            "token_chars": [
+              "letter",
+              "digit",
+              "whitespace"
+            ]
           }
         }
       }
     }
   },
+
   "mappings": {
     "properties": {
       "id": { "type": "keyword" },
+
+      "uniqueKey": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer"
+      },
+
       "name": {
         "type": "text",
         "analyzer": "autocomplete_analyzer",
@@ -40,12 +58,15 @@
           "standard": { "type": "text", "analyzer": "standard" }
         }
       },
-      "name_spell": {
+
+      "nameSpell": {
         "type": "text",
         "analyzer": "standard"
       },
+
       "price": { "type": "double" },
       "description": { "type": "text" },
+
       "correctedQuery": { "type": "keyword", "index": false }
     }
   }
