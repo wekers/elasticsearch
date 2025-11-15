@@ -21,6 +21,7 @@ public class RabbitMQProperties {
         private String main;
         private String retry5s;
         private String dead;
+        private String deleted;
     }
 
     @Getter
@@ -36,6 +37,7 @@ public class RabbitMQProperties {
         private String created;
         private String retry5s;
         private String dead;
+        private String deleted;
     }
 
     @Getter
