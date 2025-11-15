@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ProductEsRepository extends ElasticsearchRepository<ProductDocument, String> {
 
+    boolean existsByUniqueKey(String uniqueKey);
+
+    //boolean existsByNameAndDescription(String name, String description);
+
 }
