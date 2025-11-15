@@ -42,6 +42,24 @@ Content-Type: application/json
   "price":523.06
 }
 
+##################################################################################
+# Microservice A - Delete Product
+### parameters
+### Criar produto no Microserviço A - Create product in Microservice A
+DELETE http://localhost:8080/products/c7fcf6c7-907f-4d18-bf9c-7cac9867dcfc
+
+##################################################################################
+# Microservice A - Update Product
+### parameters
+### CUpdate produto no Microserviço A - Update product in Microservice A
+PUT http://localhost:8080/products/09f74e9a-0be8-42c3-8b22-e4ac137c4f42
+Content-Type: application/json
+
+{
+"name":"Notebook Gamer 2",
+"description":"RTX 4070 16GB",
+"price":4600.00
+}
 
 ##################################################################################
 # Microservice B - Health Check
