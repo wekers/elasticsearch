@@ -1,9 +1,9 @@
 package com.wekers.microsb.service;
 
-import com.fasterxml.jackson.core.JsonParseException;
+import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.OpType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
-import com.wekers.microsb.config.RabbitMQConstants;
 import com.wekers.microsb.config.RabbitMQProperties;
 import com.wekers.microsb.document.ProductDocument;
 import com.wekers.microsb.repository.ProductEsRepository;
@@ -13,12 +13,14 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
-import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.stereotype.Service;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch.core.GetResponse;
+import co.elastic.clients.elasticsearch.core.IndexResponse;
+
+
 import java.io.IOException;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -26,112 +28,172 @@ import java.util.Map;
 public class ProductConsumer {
 
     private final ProductEsRepository esRepository;
-    private final RabbitTemplate rabbitTemplate;
-    private final Jackson2JsonMessageConverter messageConverter;
-    private final RabbitMQProperties properties;
     private final ObjectMapper objectMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final RabbitMQProperties properties;
+    private final ElasticsearchClient client;
 
-    @RabbitListener(queues = "${app.rabbitmq.queues.main}", containerFactory = "manualAckFactory")
+    @RabbitListener(
+            queues = "${app.rabbitmq.queues.main}",
+            containerFactory = "manualAckFactory"
+    )
     public void receive(Message msg, Channel channel) throws IOException {
         long tag = msg.getMessageProperties().getDeliveryTag();
 
         try {
-            ProductDocument doc = convertToProductDocument(msg);
-            esRepository.save(doc);
-            channel.basicAck(tag, false);
-            log.info("✅ Product processed successfully: {}", doc.getId());
+            // ============================================================
+            // 1) Deserialize + sempre corrigir campos calculados
+            // ============================================================
+            ProductDocument doc =
+                    objectMapper.readValue(msg.getBody(), ProductDocument.class);
 
-        } catch (Exception ex) {
-            log.error("❌ Error processing message", ex);
-            handleProcessingFailure(msg, channel, tag, ex);
-        }
-    }
+            // sempre gerar UNIQUE_KEY
+            doc.rebuildUniqueKey();
 
-    private ProductDocument convertToProductDocument(Message message) throws IOException {
-        try {
-            // Tenta converter usando o messageConverter
-            Object converted = messageConverter.fromMessage(message);
-
-            if (converted instanceof ProductDocument doc) {
-                return doc;
-            } else if (converted instanceof String jsonString) {
-                log.debug("Converting from String: {}", jsonString);
-                return objectMapper.readValue(jsonString, ProductDocument.class);
-            } else if (converted instanceof Map<?, ?> map) {
-                log.debug("Converting from Map: {}", map);
-                // Converte o Map em ProductDocument
-                return objectMapper.convertValue(map, ProductDocument.class);
-            } else {
-                throw new IllegalArgumentException("Unsupported message type: " + converted.getClass());
+            // garantir nameSpell preenchido
+            if (doc.getNameSpell() == null) {
+                doc.setNameSpell(doc.getName());
             }
 
-        } catch (Exception e) {
-            // Fallback: tenta converter diretamente do body
-            log.warn("Fallback conversion from raw body");
-            return objectMapper.readValue(message.getBody(), ProductDocument.class);
+            // ============================================================
+            // 2) Verificar duplicidade por ID
+            // ============================================================
+            boolean existsId = esRepository.existsById(doc.getId());
+
+            // ============================================================
+            // 3) Verificar duplicidade por uniqueKey
+            // ============================================================
+            boolean existsKey = esRepository.existsByUniqueKey(doc.getUniqueKey());
+
+            if (existsId && existsKey) {
+                log.warn(" Duplicate (ID + UNIQUE_KEY) ignored → {}", doc.getUniqueKey());
+                channel.basicAck(tag, false);
+                return;
+            }
+
+            // ============================================================
+            // 4) CREATE → somente se ID não existe
+            // ============================================================
+            if (!existsId) {
+                IndexResponse response = client.index(i -> i
+                        .index("products_write")
+                        .id(doc.getId())
+                        .opType(OpType.Create) // create-only
+                        .document(doc)
+                );
+
+                log.info("Created in ES: id={} result={}", doc.getId(), response.result());
+                channel.basicAck(tag, false);
+                return;
+            }
+
+            // ============================================================
+            // 5) UPDATE — existe ID → fazer update com Optimistic locking
+            // ============================================================
+            // 1) Buscar documento atual
+            GetResponse<ProductDocument> current = client.get(
+                    g -> g.index("products_write").id(doc.getId()),
+                    ProductDocument.class
+            );
+
+            if (!current.found()) {
+                log.warn("Document disappeared during update — fallback CREATE");
+                client.index(i -> i
+                        .index("products_write")
+                        .id(doc.getId())
+                        .opType(OpType.Create)
+                        .document(doc)
+                );
+                channel.basicAck(tag, false);
+                return;
+            }
+
+            long seqNo = current.seqNo();
+            long primaryTerm = current.primaryTerm();
+
+            // 2) UPDATE via index (optimistic locking)
+            try {
+                IndexResponse update = client.index(i -> i
+                        .index("products_write")
+                        .id(doc.getId())
+                        .ifSeqNo(seqNo)
+                        .ifPrimaryTerm(primaryTerm)
+                        .document(doc)
+                );
+
+                log.info("Updated OK: id={} version={} result={}", doc.getId(),
+                        update.version(), update.result());
+                channel.basicAck(tag, false);
+                return;
+            }
+            catch (ElasticsearchException lockEx) {
+
+                // Outro processo gravou no ES antes, conflito → tentar novamente
+                if (lockEx.getMessage().contains("version_conflict_engine_exception")) {
+                    log.warn("Version conflict — retrying message");
+                    retryMessage(msg, channel, tag);
+                    return;
+                }
+
+                throw lockEx;
+            }
+
+        }
+        catch (Exception e) {
+            log.error("Error processing event", e);
+
+            retryMessage(msg, channel, tag);
         }
     }
 
-    private void handleProcessingFailure(Message message, Channel channel, long deliveryTag, Exception ex) throws IOException {
-        MessageProperties props = message.getMessageProperties();
-        int retryCount = (int) props.getHeaders().getOrDefault(RabbitMQConstants.RETRY_HEADER, 0);
-        boolean fatal = isFatalError(ex);
+    // ============================================================
+    // REPROCESSAMENTO COM CONTROLE DE RETENTATIVAS
+    // ============================================================
+    private void retryMessage(Message msg, Channel channel, long tag) throws IOException {
 
-        // 🚨 JSON inválido -> DLQ imediata
-        if (fatal) {
-            log.warn("🚫 Fatal message conversion error → sending directly to DLQ");
-            sendToDeadLetter(message);
-            channel.basicAck(deliveryTag, false);
+        int retry = (int) msg.getMessageProperties()
+                .getHeaders()
+                .getOrDefault("x-retry-count", 0);
+
+        if (retry >= properties.getRetry().getMaxAttempts()) {
+            log.error("Max retries reached — sending to DLQ");
+
+            rabbitTemplate.convertAndSend(
+                    properties.getExchanges().getDlx(),
+                    properties.getRoutingKeys().getDead(),
+                    new Message(msg.getBody(), copyHeaders(msg, false))
+            );
+
+            channel.basicAck(tag, false);
             return;
         }
 
-        // ⚙️ Retry controlado
-        if (retryCount < properties.getRetry().getMaxAttempts()) {
-            sendToRetry(message, retryCount);
-            log.warn("🔄 Message sent to retry queue, attempt: {}", retryCount + 1);
-        } else {
-            sendToDeadLetter(message);
-            log.error("☠️ Message sent to dead letter queue after max retries");
-        }
+        // Incrementa retry
+        MessageProperties props = copyHeaders(msg, true);
+        props.setHeader("x-retry-count", retry + 1);
 
-        channel.basicAck(deliveryTag, false);
-    }
-
-    private boolean isFatalError(Exception ex) {
-        Throwable cause = ex.getCause();
-        return ex instanceof MessageConversionException
-                || ex instanceof JsonParseException
-                || (cause != null && cause instanceof JsonParseException)
-                || (cause != null && cause instanceof MessageConversionException);
-    }
-
-    private void sendToRetry(Message originalMessage, int currentRetryCount) {
-        MessageProperties retryProps = createMessageProperties(originalMessage);
-        retryProps.setHeader(RabbitMQConstants.RETRY_HEADER, currentRetryCount + 1);
-        Message retryMessage = new Message(originalMessage.getBody(), retryProps);
+        // Envia para fila de retry
         rabbitTemplate.send(
                 properties.getExchanges().getDlx(),
                 properties.getRoutingKeys().getRetry5s(),
-                retryMessage
+                new Message(msg.getBody(), props)
         );
+
+        channel.basicAck(tag, false);
     }
 
-    private void sendToDeadLetter(Message originalMessage) {
-        MessageProperties deadProps = createMessageProperties(originalMessage);
-        deadProps.getHeaders().remove(RabbitMQConstants.RETRY_HEADER);
-        Message deadMessage = new Message(originalMessage.getBody(), deadProps);
-        rabbitTemplate.send(
-                properties.getExchanges().getDlx(),
-                properties.getRoutingKeys().getDead(),
-                deadMessage
-        );
-    }
-
-    private MessageProperties createMessageProperties(Message originalMessage) {
+    // ============================================================
+    // Copiar headers corretamente
+    // ============================================================
+    private MessageProperties copyHeaders(Message original, boolean keepRetryHeader) {
         MessageProperties props = new MessageProperties();
-        props.getHeaders().putAll(originalMessage.getMessageProperties().getHeaders());
+        props.getHeaders().putAll(original.getMessageProperties().getHeaders());
+
+        if (!keepRetryHeader)
+            props.getHeaders().remove("x-retry-count");
+
         props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
-        props.setContentEncoding(originalMessage.getMessageProperties().getContentEncoding());
+        props.setContentEncoding(original.getMessageProperties().getContentEncoding());
         return props;
     }
 }
