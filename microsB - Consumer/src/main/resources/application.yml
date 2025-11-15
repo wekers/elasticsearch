@@ -29,6 +29,7 @@ app:
       main: "products.queue"
       retry5s: "products.retry.5s.queue"
       dead: "products.dead.queue"
+      deleted: "products.deleted.queue"
     exchanges:
       main: "products.exchange"
       dlx: "products.dlx"
@@ -36,9 +37,11 @@ app:
       created: "products.created"
       retry5s: "products.retry.5s"
       dead: "products.dead"
+      deleted: "products.deleted"
     retry:
       max-attempts: 3
       retry-delay-ms: 5000
+
 
 # Config of Actuator
 management:
