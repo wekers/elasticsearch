@@ -2,21 +2,24 @@ package com.wekers.microsb.document;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
-import org.springframework.data.elasticsearch.annotations.Setting;
-
+import org.springframework.data.elasticsearch.annotations.*;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Document(indexName = "products_write")
 @Setting(settingPath = "/elasticsearch/product-settings.json")
 public class ProductDocument {
 
+    // ========================================================================
+    // CORE FIELDS
+    // ========================================================================
     @Id
     private String id;
 
-    @Field(type = FieldType.Text, analyzer = "autocomplete_analyzer", searchAnalyzer = "standard")
+    @Field(type = FieldType.Text,
+            analyzer = "autocomplete_analyzer",
+            searchAnalyzer = "standard")
     private String name;
 
     @Field(type = FieldType.Double)
@@ -25,19 +28,33 @@ public class ProductDocument {
     @Field(type = FieldType.Text)
     private String description;
 
-    // Campo para correção ortográfica + busca normalizada
+    // ========================================================================
+    // AUTOCOMPLETE / SUGGESTION / SPELLING SUPPORT
+    // ========================================================================
     @Field(type = FieldType.Text, analyzer = "standard")
     private String nameSpell;
-
-    // Chave única para prevenir duplicidade (name + description)
-    @Field(type = FieldType.Keyword)
-    private String uniqueKey;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String correctedQuery;
 
-    // ---------- CONSTRUCTORS ----------
+    // ========================================================================
+    // UNIQUE KEY (NAME + DESCRIPTION NORMALIZED)
+    // ========================================================================
+    @Field(type = FieldType.Keyword, normalizer = "lowercase_normalizer")
+    private String uniqueKey;
 
+    // ========================================================================
+    // AUDITING FIELDS FOR UPDATE/CHANGE DETECTION
+    // ========================================================================
+    @Field(type = FieldType.Date, format = DateFormat.date_time)
+    private Instant updatedAt;
+
+    @Field(type = FieldType.Date, format = DateFormat.date_time)
+    private Instant priceChangedAt;
+
+    // ========================================================================
+    // CONSTRUCTORS
+    // ========================================================================
     public ProductDocument() {}
 
     public ProductDocument(String id, String name, BigDecimal price, String description) {
@@ -45,14 +62,39 @@ public class ProductDocument {
         this.name = name;
         this.price = price;
         this.description = description;
-
-        // Preenche os campos derivados
         this.nameSpell = name;
         this.uniqueKey = buildUniqueKey(name, description);
+        this.updatedAt = Instant.now();
+        this.priceChangedAt = Instant.now();
     }
 
-    // ---------- GETTERS / SETTERS ----------
+    // ========================================================================
+    // UNIQUE KEY BUILDER
+    // ========================================================================
+    public static String buildUniqueKey(String name, String desc) {
+        if (name == null) name = "";
+        if (desc == null) desc = "";
+        return (name.trim().toLowerCase() + "::" + desc.trim().toLowerCase());
+    }
 
+    public void rebuildUniqueKey() {
+        this.uniqueKey = buildUniqueKey(this.name, this.description);
+    }
+
+    // ========================================================================
+    // MARKERS
+    // ========================================================================
+    public void markUpdated() {
+        this.updatedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    }
+
+    public void markPriceChanged() {
+        this.priceChangedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    }
+
+    // ========================================================================
+    // GETTERS / SETTERS
+    // ========================================================================
     public String getId() {
         return id;
     }
@@ -65,33 +107,44 @@ public class ProductDocument {
         return name;
     }
 
-    /**
-     * Sempre que o nome muda, refaz nameSpell e uniqueKey também.
-     */
+    // mantém sincronização com nameSpell + uniqueKey
     public void setName(String name) {
         this.name = name;
-        this.nameSpell = name; // mantém sincronizado
-        this.rebuildUniqueKey();
+        this.nameSpell = name;
+        rebuildUniqueKey();
+        markUpdated();
     }
 
     public BigDecimal getPrice() {
         return price;
     }
 
+    // detecta mudança de preço
     public void setPrice(BigDecimal price) {
+        if (this.price == null || (price != null && price.compareTo(this.price) != 0)) {
+            markPriceChanged();
+        }
         this.price = price;
+        markUpdated();
     }
 
     public String getDescription() {
         return description;
     }
 
-    /**
-     * Sempre que a descrição muda, refaz uniqueKey.
-     */
+    // mantém uniqueKey sincronizada
     public void setDescription(String description) {
         this.description = description;
         rebuildUniqueKey();
+        markUpdated();
+    }
+
+    public String getCorrectedQuery() {
+        return correctedQuery;
+    }
+
+    public void setCorrectedQuery(String correctedQuery) {
+        this.correctedQuery = correctedQuery;
     }
 
     public String getNameSpell() {
@@ -106,35 +159,12 @@ public class ProductDocument {
         return uniqueKey;
     }
 
-    private void setUniqueKey(String uniqueKey) {
-        this.uniqueKey = uniqueKey;
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
-    public String getCorrectedQuery() {
-        return correctedQuery;
+    public Instant getPriceChangedAt() {
+        return priceChangedAt;
     }
 
-    public void setCorrectedQuery(String correctedQuery) {
-        this.correctedQuery = correctedQuery;
-    }
-
-    // ---------- HELPERS ----------
-
-    /**
-     * Gera chave única normalizada:
-     *   notebook lenovo ryzen::memory 24gb
-     */
-    private static String buildUniqueKey(String name, String desc) {
-        if (name == null) name = "";
-        if (desc == null) desc = "";
-
-        return (name.trim().toLowerCase() + "::" + desc.trim().toLowerCase()).trim();
-    }
-
-    /**
-     * Recria a uniqueKey quando nome ou descrição mudam.
-     */
-    public void rebuildUniqueKey() {
-        this.uniqueKey = buildUniqueKey(this.name, this.description);
-    }
 }
