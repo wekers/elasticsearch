@@ -16,7 +16,7 @@
             "filter": ["lowercase", "asciifolding"]
           },
           "autocomplete_search_analyzer": {
-            "tokenizer": "autocomplete_tokenizer",
+            "tokenizer": "standard",
             "filter": ["lowercase", "asciifolding"]
           },
           "standard": {
@@ -28,16 +28,16 @@
             "type": "edge_ngram",
             "min_gram": 2,
             "max_gram": 20,
-            "token_chars": ["letter", "digit", "whitespace"]
+            "token_chars": ["letter", "digit"]
           }
         }
       }
     }
   },
-
   "mappings": {
     "properties": {
       "id":           { "type": "keyword" },
+
       "name": {
         "type": "text",
         "analyzer": "autocomplete_analyzer",
@@ -47,6 +47,7 @@
           "standard":  { "type": "text", "analyzer": "standard" }
         }
       },
+
       "nameSpell":      { "type": "text", "analyzer": "standard" },
       "price":          { "type": "double" },
       "description":    { "type": "text" },
