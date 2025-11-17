@@ -5,22 +5,20 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.amqp.support.converter.SimpleMessageConverter;
 
 @Configuration
 public class RabbitConfig {
 
     @Bean
     public SimpleRabbitListenerContainerFactory manualAckFactory(
-            ConnectionFactory cf
+            ConnectionFactory connectionFactory
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        factory.setConnectionFactory(cf);
+        factory.setConnectionFactory(connectionFactory);
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
-
-        // FORÇA O RABBIT A NÃO USAR JACKSON E NÃO USAR TYPEID
-        factory.setMessageConverter(new org.springframework.amqp.support.converter.SimpleMessageConverter());
-
+        // não tenta usar Jackson2MessageConverter, usa texto/byte puro
+        factory.setMessageConverter(new SimpleMessageConverter());
         return factory;
     }
 }
-
