@@ -1,0 +1,80 @@
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: MANUAL
+        default-requeue-rejected: false
+        retry:
+          enabled: false # Desabilita retry automático, usamos manual
+  thymeleaf:
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
+  # Elasticsearch configuration
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
+
+
+app:
+  rabbitmq:
+    queues:
+      retry5s: "products.retry.5s.queue"
+      dead: "products.dead.queue"
+      deleted: "products.deleted.queue"
+      created: "products.created.queue"
+      updated: "products.updated.queue"
+
+    exchanges:
+      main: "products.exchange"
+      dlx: "products.dlx"
+
+    routing-keys:
+      created: "products.created"
+      updated: "products.updated"
+      retry5s: "products.retry.5s"
+      dead: "products.dead"
+      deleted: "products.deleted"
+
+    retry:
+      max-attempts: 3
+      retry-delay-ms: 5000
+
+
+# Config of Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,beans
+    access:
+      default: read_only
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    info:
+      access: read_only
+    metrics:
+      access: read_only
+    env:
+      access: read_only
+    beans:
+      access: read_only
+
+# Health check of RabbitMQ
+  health:
+    rabbit:
+      enabled: true
+    diskspace:
+      enabled: true
+    ping:
+      enabled: true
+
+server:
+  port: 8081
