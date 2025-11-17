@@ -1,56 +1,6 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5435/microsa
-    username: microsa
-    password: microsa
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate   # em prod: validate (ou none) — nada de create/update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        jdbc.lob.non_contextual_creation: true
-      open-in-view: false
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    locations: classpath:db/migration
-  rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
-    publisher-confirm-type: correlated # Habilita confirmações (ConfirmCallback)
-    publisher-returns: true # Habilita retorno de mensagens não roteadas (ReturnsCallback)
-app:
-  rabbitmq:
-    queues:
-      main: "products.queue"
-      retry5s: "products.retry.5s.queue"
-      dead: "products.dead.queue"
-      deleted: "products.deleted.queue"
+  application:
+    name: microsa-producer
 
-    exchanges:
-      main: "products.exchange"
-      dlx: "products.dlx"
-
-    routing-keys:
-      created: "products.created"
-      updated: "products.updated"
-      retry5s: "products.retry.5s"
-      dead: "products.dead"
-      deleted: "products.deleted"
-
-    retry:
-      max-attempts: 3
-      retry-delay-ms: 5000
-
-
-server:
-  port: 8080
-
-
-
-
+  profiles:
+    active: local
