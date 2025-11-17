@@ -18,10 +18,11 @@ public class RabbitMQProperties {
     @Getter
     @Setter
     public static class Queues {
-        private String main;
         private String retry5s;
         private String dead;
         private String deleted;
+        private String created;
+        private String updated;
     }
 
     @Getter
@@ -35,6 +36,7 @@ public class RabbitMQProperties {
     @Setter
     public static class RoutingKeys {
         private String created;
+        private String updated;
         private String retry5s;
         private String dead;
         private String deleted;
@@ -43,7 +45,7 @@ public class RabbitMQProperties {
     @Getter
     @Setter
     public static class RetryConfig {
-        private int maxAttempts = 3;
-        private long retryDelayMs = 5000;
+        private int maxAttempts;
+        private long retryDelayMs;
     }
 }
