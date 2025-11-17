@@ -11,129 +11,207 @@
             --panel: #2b3137;
             --text: #e6edf3;
             --muted: #9aa4af;
-            --ok: #f5c518;
-            --bad: #d73a49;
+            --ok: #0ea5e9;
+            --warn: #f59e0b;
+            --bad: #ef4444;
             --card: #111418;
             --btn: #2d333b;
             --btn-hover: #3a424b;
             --live-indicator: #10b981;
         }
+
         * { box-sizing: border-box; }
+
         body {
-            margin: 0; padding: 24px;
-            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-            background: var(--bg); color: var(--text);
+            margin: 0;
+            padding: 24px;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto;
+            background: var(--bg);
+            color: var(--text);
         }
 
+        .container { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
+
         .title {
-            font-size: 28px; font-weight: 700; margin: 0 0 20px;
-            display: flex; gap: 10px; align-items: center;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
+
         .live-indicator {
-            display: flex; align-items: center; gap: 6px;
-            font-size: 14px; color: var(--live-indicator);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: var(--live-indicator);
         }
+
         .live-dot {
-            width: 8px; height: 8px; background: var(--live-indicator);
-            border-radius: 50%; animation: pulse 2s infinite;
+            width: 8px;
+            height: 8px;
+            background: var(--live-indicator);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.4; }
             100% { opacity: 1; }
         }
 
-        .container { max-width: 1100px; margin: 0 auto; display: grid; gap: 16px; }
-
         .section {
-            background: var(--panel); border-radius: 10px;
+            background: var(--panel);
+            border-radius: 10px;
             padding: 12px 14px;
         }
+
         .section-header {
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 8px;
         }
+
         .section h2 {
-            font-size: 14px; font-weight: 700; letter-spacing: .4px;
-            text-transform: uppercase; opacity: .9; margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            opacity: .9;
+            margin: 0;
         }
 
         .queue-name {
-            background: #4b5563; color: #fff; border-radius: 8px;
-            padding: 10px 12px; font-size: 13px; flex-grow: 1;
+            background: #4b5563;
+            color: #fff;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            flex-grow: 1;
         }
-        .queue-name.ok { background: #f59e0b; color: #1e2328; }
-        .queue-name.bad { background: #ef4444; }
+
+        .queue-name.created { background: #0ea5e9; }
+        .queue-name.updated { background: #6366f1; }
+        .queue-name.deleted { background: #f59e0b; color: #1e2328; }
+        .queue-name.retry { background: #059669; }
+        .queue-name.dead { background: #ef4444; }
 
         .message-count {
-            background: #374151; color: #fff; border-radius: 6px;
-            padding: 6px 10px; font-size: 12px; font-weight: bold;
-            margin-left: 10px; min-width: 60px; text-align: center;
+            background: #374151;
+            color: #fff;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
         }
+
         .message-count.high { background: #dc2626; }
         .message-count.medium { background: #d97706; }
         .message-count.low { background: #059669; }
 
         .msg-card {
-            background: var(--card); border-radius: 8px; padding: 10px;
-            margin: 10px 0; border: 1px solid #2b3137;
+            background: var(--card);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #2b3137;
             animation: fadeIn 0.3s ease-in;
         }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-5px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .msg-pre {
-            margin: 0; white-space: pre-wrap; word-break: break-word;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New";
-            font-size: 12px; background: #0b0f14; color: #e5e7eb;
-            padding: 10px; border-radius: 6px;
-            max-height: 200px; overflow-y: auto;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            background: #0b0f14;
+            color: #e5e7eb;
+            padding: 10px;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
         }
 
-        .actions { margin-top: 8px; display: flex; gap: 8px; }
-        .btn {
-            appearance: none; border: 0; background: var(--btn); color: var(--text); border-radius: 6px;
-            padding: 8px 10px; font-size: 12px; cursor: pointer; transition: background 0.2s;
+        .actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
         }
+
+        .btn {
+            border: 0;
+            background: var(--btn);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
         .btn:hover { background: var(--btn-hover); }
-        .btn.ok { background: #0ea5e9; }
+        .btn.ok { background: var(--ok); }
         .btn.ok:hover { background: #0284c7; }
-        .btn.danger { background: #ef4444; }
+        .btn.danger { background: var(--bad); }
         .btn.danger:hover { background: #dc2626; }
 
         .empty {
-            color: var(--muted); font-size: 13px; margin: 6px 0 12px;
-            text-align: center; padding: 20px;
+            color: var(--muted);
+            font-size: 13px;
+            margin: 6px 0 12px;
+            text-align: center;
+            padding: 20px;
         }
 
         .controls {
-            display: flex; gap: 10px; margin-bottom: 20px; align-items: center;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
         }
+
         .control-btn {
-            background: #374151; color: white; border: none; padding: 8px 16px;
-            border-radius: 6px; cursor: pointer; font-size: 13px;
+            background: #374151;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
         }
+
         .control-btn:hover { background: #4b5563; }
-        .auto-refresh { display: flex; align-items: center; gap: 8px; }
-        .auto-refresh label { font-size: 13px; color: var(--muted); }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 
 <body>
 
 <div class="container">
-
     <div class="title">
         🐇 RabbitMQ Dashboard
         <div class="live-indicator">
-            <div class="live-dot"></div>
-            <span>LIVE</span>
+            <div class="live-dot"></div><span>LIVE</span>
         </div>
     </div>
 
-    <!-- Controles -->
+    <!-- Controls -->
     <div class="controls">
         <button class="control-btn" onclick="refreshAll()">🔄 Atualizar Agora</button>
 
@@ -147,44 +225,54 @@
         </div>
     </div>
 
-    <!-- MAIN QUEUE -->
-    <section class="section" id="mainQueueSection">
+    <!-- CREATED -->
+    <section class="section" id="createdSection">
         <div class="section-header">
-            <h2>Fila Principal</h2>
-            <div class="message-count" id="mainCount">0</div>
+            <h2>Created Queue</h2>
+            <div class="message-count" id="createdCount">0</div>
         </div>
-        <div class="queue-name" th:text="${mainQueue}">products.queue</div>
-        <div id="mainMessages"></div>
+        <div class="queue-name created" th:text="${createdQueue}">products.created.queue</div>
+        <div id="createdMessages"></div>
     </section>
 
-    <!-- RETRY QUEUE -->
-    <section class="section" id="retryQueueSection">
+    <!-- UPDATED -->
+    <section class="section" id="updatedSection">
         <div class="section-header">
-            <h2>Fila Retry</h2>
-            <div class="message-count" id="retryCount">0</div>
+            <h2>Updated Queue</h2>
+            <div class="message-count" id="updatedCount">0</div>
         </div>
-        <div class="queue-name ok" th:text="${retryQueue}">products.retry.5s.queue</div>
-        <div id="retryMessages"></div>
+        <div class="queue-name updated" th:text="${updatedQueue}">products.updated.queue</div>
+        <div id="updatedMessages"></div>
     </section>
 
-    <!-- DEAD LETTER QUEUE -->
-    <section class="section" id="deadQueueSection">
-        <div class="section-header">
-            <h2>Dead Letter Queue</h2>
-            <div class="message-count" id="deadCount">0</div>
-        </div>
-        <div class="queue-name bad" th:text="${deadQueue}">products.dead.queue</div>
-        <div id="deadMessages"></div>
-    </section>
-
-    <!-- DELETED QUEUE -->
-    <section class="section" id="deletedQueueSection">
+    <!-- DELETED -->
+    <section class="section" id="deletedSection">
         <div class="section-header">
             <h2>Deleted Queue</h2>
             <div class="message-count" id="deletedCount">0</div>
         </div>
-        <div class="queue-name" th:text="${deletedQueue}">products.deleted.queue</div>
+        <div class="queue-name deleted" th:text="${deletedQueue}">products.deleted.queue</div>
         <div id="deletedMessages"></div>
+    </section>
+
+    <!-- RETRY -->
+    <section class="section" id="retrySection">
+        <div class="section-header">
+            <h2>Retry Queue</h2>
+            <div class="message-count" id="retryCount">0</div>
+        </div>
+        <div class="queue-name retry" th:text="${retryQueue}">products.retry.5s.queue</div>
+        <div id="retryMessages"></div>
+    </section>
+
+    <!-- DEAD LETTER -->
+    <section class="section" id="deadSection">
+        <div class="section-header">
+            <h2>Dead Letter Queue</h2>
+            <div class="message-count" id="deadCount">0</div>
+        </div>
+        <div class="queue-name dead" th:text="${deadQueue}">products.dead.queue</div>
+        <div id="deadMessages"></div>
     </section>
 
 </div>
@@ -198,39 +286,42 @@
         startAutoRefresh();
     });
 
-    // Snapshot para evitar repintar a página em cada refresh
-    let lastSnapshot = { main: '', retry: '', dead: '', deleted: '' };
+    let lastSnapshot = {
+        created: '',
+        updated: '',
+        deleted: '',
+        retry: '',
+        dead: ''
+    };
 
     async function refreshAll() {
         try {
-            const response = await fetch('/queues/api/all-messages');
-            const data = await response.json();
+            const res = await fetch('/queues/api/all-messages');
+            const data = await res.json();
 
-            updateQueueSection('main', data.mainMessages, data.mainCount);
+            updateQueueSection('created', data.createdMessages, data.createdCount);
+            updateQueueSection('updated', data.updatedMessages, data.updatedCount);
+            updateQueueSection('deleted', data.deletedMessages, data.deletedCount);
             updateQueueSection('retry', data.retryMessages, data.retryCount);
             updateQueueSection('dead', data.deadMessages, data.deadCount);
-            updateQueueSection('deleted', data.deletedMessages, data.deletedCount);
 
             updateLastUpdateTime();
-
         } catch (error) {
-            console.error('Erro ao atualizar:', error);
+            console.error("Erro:", error);
         }
     }
 
-    function updateQueueSection(queueType, messages, count) {
-        const container = document.getElementById(`${queueType}Messages`);
-        const countElement = document.getElementById(`${queueType}Count`);
+    function updateQueueSection(queue, messages, count) {
+        const container = document.getElementById(`${queue}Messages`);
+        const counter = document.getElementById(`${queue}Count`);
 
-        countElement.textContent = count;
-        updateCountStyle(countElement, count);
+        counter.textContent = count;
+        updateCountStyle(counter, count);
 
         const snapshot = JSON.stringify(messages);
+        if (lastSnapshot[queue] === snapshot) return;
 
-        if (lastSnapshot[queueType] === snapshot) return;
-
-        lastSnapshot[queueType] = snapshot;
-
+        lastSnapshot[queue] = snapshot;
         container.innerHTML = '';
 
         if (!messages || messages.length === 0) {
@@ -238,21 +329,17 @@
             return;
         }
 
-        messages.forEach(message => {
-            const card = createMessageCard(message, queueType);
-            container.appendChild(card);
-        });
+        messages.forEach(m => container.appendChild(createMessageCard(m, queue)));
     }
 
-    function updateCountStyle(element, count) {
-        element.classList.remove('high', 'medium', 'low');
-
-        if (count > 10) element.classList.add('high');
-        else if (count > 5) element.classList.add('medium');
-        else if (count > 0) element.classList.add('low');
+    function updateCountStyle(el, count) {
+        el.classList.remove("high", "medium", "low");
+        if (count > 10) el.classList.add("high");
+        else if (count > 5) el.classList.add("medium");
+        else if (count > 0) el.classList.add("low");
     }
 
-    function createMessageCard(message, queueType) {
+    function createMessageCard(message, queue) {
         const card = document.createElement('div');
         card.className = 'msg-card';
 
@@ -264,41 +351,38 @@
         actions.className = 'actions';
 
         // REPROCESS
-        const reprocessForm = document.createElement('form');
-        reprocessForm.action = '/queues/reprocess';
-        reprocessForm.method = 'post';
+        const form = document.createElement('form');
+        form.action = '/queues/reprocess';
+        form.method = 'post';
 
-        const reprocessInput = document.createElement('input');
-        reprocessInput.type = 'hidden';
-        reprocessInput.name = 'body';
-        reprocessInput.value = message;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'body';
+        input.value = message;
 
-        const reprocessButton = document.createElement('button');
-        reprocessButton.type = 'submit';
-        reprocessButton.className = 'btn ok';
-        reprocessButton.textContent = '⟳ Reprocessar';
+        const btn = document.createElement('button');
+        btn.className = 'btn ok';
+        btn.type = 'submit';
+        btn.textContent = '⟳ Reprocessar';
 
-        reprocessForm.appendChild(reprocessInput);
-        reprocessForm.appendChild(reprocessButton);
+        form.appendChild(input);
+        form.appendChild(btn);
+        actions.appendChild(form);
 
-        actions.appendChild(reprocessForm);
+        // DELETE FIRST (only for DLQ)
+        if (queue === 'dead') {
+            const delForm = document.createElement('form');
+            delForm.action = '/queues/delete';
+            delForm.method = 'post';
+            const delBtn = document.createElement('button');
+            delBtn.type = 'submit';
+            delBtn.className = 'btn danger';
+            delBtn.textContent = '🗑 Excluir (1ª msg)';
+            delForm.appendChild(delBtn);
 
-        // DELETE (somente DLQ)
-        if (queueType === 'dead') {
-            const deleteForm = document.createElement('form');
-            deleteForm.action = '/queues/delete';
-            deleteForm.method = 'post';
-
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'submit';
-            deleteButton.className = 'btn danger';
-            deleteButton.textContent = '🗑 Excluir (1ª mensagem)';
-
-            deleteForm.appendChild(deleteButton);
-
-            // só adiciona no primeiro card da lista
-            if (document.getElementById(`${queueType}Messages`).children.length === 0) {
-                actions.appendChild(deleteForm);
+            // only add to first card
+            if (document.getElementById(`${queue}Messages`).children.length === 0) {
+                actions.appendChild(delForm);
             }
         }
 
@@ -309,8 +393,8 @@
     }
 
     function updateLastUpdateTime() {
-        const now = new Date();
-        document.getElementById('lastUpdate').textContent = now.toLocaleTimeString('pt-BR');
+        document.getElementById('lastUpdate').textContent =
+            new Date().toLocaleTimeString('pt-BR');
     }
 
     function startAutoRefresh() {
@@ -318,58 +402,10 @@
         autoRefreshInterval = setInterval(refreshAll, AUTO_REFRESH_INTERVAL);
     }
 
-    function stopAutoRefresh() {
-        if (autoRefreshInterval) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshInterval = null;
-        }
-    }
-
     function toggleAutoRefresh() {
-        const checkbox = document.getElementById('autoRefresh');
-        if (checkbox.checked) startAutoRefresh();
-        else stopAutoRefresh();
-    }
-
-    async function refreshQueue(queueName) {
-        try {
-            const response = await fetch(`/queues/api/messages/${queueName}`);
-            const data = await response.json();
-
-            let queueType;
-            if (queueName.includes('main')) queueType = 'main';
-            else if (queueName.includes('retry')) queueType = 'retry';
-            else if (queueName.includes('dead')) queueType = 'dead';
-            else if (queueName.includes('deleted')) queueType = 'deleted';
-            else return;
-
-            updateQueueSection(queueType, data.messages, data.messages.length);
-
-        } catch (error) {
-            console.error(`Erro ao atualizar ${queueName}:`, error);
-        }
-    }
-
-    async function refreshCounters() {
-        try {
-            const response = await fetch('/queues/api/status');
-            const data = await response.json();
-
-            document.getElementById('mainCount').textContent = data.mainCount;
-            document.getElementById('retryCount').textContent = data.retryCount;
-            document.getElementById('deadCount').textContent = data.deadCount;
-            document.getElementById('deletedCount').textContent = data.deletedCount;
-
-            updateCountStyle(document.getElementById('mainCount'), data.mainCount);
-            updateCountStyle(document.getElementById('retryCount'), data.retryCount);
-            updateCountStyle(document.getElementById('deadCount'), data.deadCount);
-            updateCountStyle(document.getElementById('deletedCount'), data.deletedCount);
-
-            updateLastUpdateTime();
-
-        } catch (error) {
-            console.error('Erro ao atualizar contadores:', error);
-        }
+        const chk = document.getElementById("autoRefresh");
+        if (chk.checked) startAutoRefresh();
+        else clearInterval(autoRefreshInterval);
     }
 </script>
 
