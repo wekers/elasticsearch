@@ -1,9 +1,9 @@
-package com.wekers.microsb.service;
+package com.wekers.microsb.service.consumers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.wekers.microsb.dto.ProductDeletedEvent;
-import com.wekers.microsb.repository.ProductEsRepository;
+import com.wekers.microsb.service.handlers.ProductDeletedHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -15,31 +15,28 @@ import java.io.IOException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProductDeleteConsumer {
+public class ProductConsumerDeletedListener {
 
-    private final ProductEsRepository esRepository;
     private final ObjectMapper objectMapper;
+    private final ProductDeletedHandler handler;
 
     @RabbitListener(
             queues = "${app.rabbitmq.queues.deleted}",
             containerFactory = "manualAckFactory"
     )
-    public void receiveDelete(Message msg, Channel channel) throws IOException {
+    public void onDeleted(Message msg, Channel channel) throws IOException {
         long tag = msg.getMessageProperties().getDeliveryTag();
 
         try {
             ProductDeletedEvent event =
                     objectMapper.readValue(msg.getBody(), ProductDeletedEvent.class);
 
-            esRepository.deleteById(String.valueOf(event.id()));
-
+            handler.processDelete(event.id().toString());
             channel.basicAck(tag, false);
-            log.info("🗑️ Deleted from ES: {}", event.id());
 
-        } catch (Exception ex) {
-            log.error("❌ Error processing DELETE event", ex);
-            channel.basicNack(tag, false, false);
+        } catch (Exception e) {
+            log.error("❌ Error processing DELETED event", e);
+            handler.retryOrDlq(msg, channel, tag, e);
         }
     }
 }
-
