@@ -23,12 +23,6 @@ public class SuggestController {
         return service.suggest(prefix);
     }
 
-    // Endpoint alternativo para debug
-    @GetMapping("/suggest-wildcard")
-    public List<String> suggestWildcard(@RequestParam String prefix) {
-        return service.suggestWildcard(prefix);
-    }
-
     // Endpoint de health check
     @GetMapping("/suggest-health")
     public String healthCheck() {
