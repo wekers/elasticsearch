@@ -1,6 +1,6 @@
 package com.wekers.microsb.service;
 
-import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import com.wekers.microsb.document.ProductDocument;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
@@ -8,7 +8,8 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class AutocompleteService {
@@ -19,69 +20,103 @@ public class AutocompleteService {
         this.operations = operations;
     }
 
+    // ============================================================
+    //       AUTOCOMPLETE PRO (Multi-strategy + fallback)
+    // ============================================================
     public List<String> suggest(String prefix) {
         if (prefix == null || prefix.trim().isEmpty()) {
             return List.of();
         }
 
-        String cleanPrefix = prefix.trim().toLowerCase();
+        String clean = prefix.trim().toLowerCase();
 
-        // Query melhorada para autocomplete
-        var query = NativeQuery.builder()
-                .withQuery(Query.of(q -> q.matchPhrasePrefix(m -> m
-                        .field("name")
-                        .query(cleanPrefix)
-                        .maxExpansions(10)
-                )))
-                .withPageable(PageRequest.of(0, 10))
-                .build();
+        // 1) Query principal (Phrase Prefix + Multi Match)
+        List<String> primary = searchPhrasePrefix(clean);
+        if (!primary.isEmpty()) return primary;
 
-        try {
-            SearchHits<ProductDocument> searchHits = operations.search(query, ProductDocument.class);
+        // 2) Query secundária (Wildcard: *term*)
+        List<String> wildcard = searchWildcard(clean);
+        if (!wildcard.isEmpty()) return wildcard;
 
-            return searchHits.getSearchHits()
-                    .stream()
-                    .map(hit -> hit.getContent().getName())
-                    .distinct()
-                    .limit(10)
-                    .toList();
-
-        } catch (Exception e) {
-            // Log do erro para debug
-            System.err.println("Erro no autocomplete: " + e.getMessage());
-            return List.of();
-        }
+        // 3) Query terciária (Fuzzy: tolera erros)
+        return searchFuzzy(clean);
     }
 
-    // Método alternativo usando wildcard (mais tolerante)
-    public List<String> suggestWildcard(String prefix) {
-        if (prefix == null || prefix.trim().isEmpty()) {
-            return List.of();
-        }
-
-        String cleanPrefix = "*" + prefix.trim().toLowerCase() + "*";
-
+    // ============================================================
+    // 1) Phrase Prefix (boosta hits mais rápidos e relevantes)
+    // ============================================================
+    private List<String> searchPhrasePrefix(String clean) {
         var query = NativeQuery.builder()
-                .withQuery(Query.of(q -> q.wildcard(w -> w
-                        .field("name")
-                        .value(cleanPrefix)
-                        .caseInsensitive(true)
+                .withQuery(Query.of(q -> q.multiMatch(mm -> mm
+                        .fields("name", "nameSpell")
+                        .query(clean)
+                        .type(TextQueryType.PhrasePrefix)
+                        .maxExpansions(20)
                 )))
                 .withPageable(PageRequest.of(0, 10))
                 .build();
 
-        try {
-            SearchHits<ProductDocument> searchHits = operations.search(query, ProductDocument.class);
+        return extractResults(query);
+    }
 
-            return searchHits.getSearchHits()
-                    .stream()
+    // ============================================================
+    // 2) Wildcard (*term*) — mais tolerante
+    // ============================================================
+    private List<String> searchWildcard(String clean) {
+        var wildcardQuery = "*" + clean + "*";
+
+        var query = NativeQuery.builder()
+                .withQuery(Query.of(q -> q.bool(b -> b
+                        .should(s -> s.wildcard(w -> w
+                                .field("name")
+                                .value(wildcardQuery)
+                                .caseInsensitive(true)
+                        ))
+                        .should(s -> s.wildcard(w -> w
+                                .field("nameSpell")
+                                .value(wildcardQuery)
+                                .caseInsensitive(true)
+                        ))
+                )))
+                .withPageable(PageRequest.of(0, 10))
+                .build();
+
+        return extractResults(query);
+    }
+
+    // ============================================================
+    // 3) Fuzzy (corrige erros de digitação)
+    // ============================================================
+    private List<String> searchFuzzy(String clean) {
+        var query = NativeQuery.builder()
+                .withQuery(Query.of(q -> q.match(m -> m
+                        .field("name")
+                        .query(clean)
+                        .fuzziness("AUTO")      // tolera 1 erro
+                        .maxExpansions(20)
+                )))
+                .withPageable(PageRequest.of(0, 10))
+                .build();
+
+        return extractResults(query);
+    }
+
+    // ============================================================
+    // Extração + remoção de duplicados (name + description)
+    // ============================================================
+    private List<String> extractResults(NativeQuery query) {
+        try {
+            SearchHits<ProductDocument> hits = operations.search(query, ProductDocument.class);
+
+            return hits.getSearchHits().stream()
                     .map(hit -> hit.getContent().getName())
+                    .filter(Objects::nonNull)
                     .distinct()
                     .limit(10)
-                    .toList();
+                    .collect(Collectors.toList());
 
         } catch (Exception e) {
-            System.err.println("Erro no wildcard suggest: " + e.getMessage());
+            System.err.println("Erro no autocomplete: " + e.getMessage());
             return List.of();
         }
     }
