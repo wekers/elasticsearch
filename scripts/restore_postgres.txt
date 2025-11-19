@@ -1,0 +1,19 @@
+O nome correto para usar no script é:
+CONTAINER_NAME="postgres"
+
+Se quiser confirmar:
+docker ps --format '{{.Names}}'
+
+
+como restaurar, entra na pasta que está o backup:
+gunzip < postgres_backup_2025-11-17_14-00-00.sql.gz | docker exec -i postgres psql -U microsa microsa
+
+
+
+Se quiser integração com crontab:
+
+crontab -e
+
+Exemplo backup diário às 03:00:
+0 3 * * * /dirWhereIsBackup/backup_postgres.sh
+
