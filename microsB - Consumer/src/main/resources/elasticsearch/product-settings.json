@@ -49,6 +49,12 @@
       },
 
       "nameSpell":      { "type": "text", "analyzer": "standard" },
+
+      "nameSpellClean": {
+        "type": "text",
+        "analyzer": "standard"
+      },
+
       "price":          { "type": "double" },
       "description":    { "type": "text" },
       "uniqueKey":      { "type": "keyword", "normalizer": "lowercase_normalizer" },
