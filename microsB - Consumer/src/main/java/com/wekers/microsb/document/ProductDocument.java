@@ -34,6 +34,10 @@ public class ProductDocument {
     @Field(type = FieldType.Text, analyzer = "standard")
     private String nameSpell;
 
+    // CAMPO PARA SPELL CHECK LIMPO
+    @Field(type = FieldType.Text, analyzer = "standard")
+    private String nameSpellClean;
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String correctedQuery;
 
@@ -63,9 +67,19 @@ public class ProductDocument {
         this.price = price;
         this.description = description;
         this.nameSpell = name;
+        this.nameSpellClean = cleanNameForSpellCheck(name); // ✅ SEMPRE LIMPO
         this.uniqueKey = buildUniqueKey(name, description);
         this.updatedAt = Instant.now();
         this.priceChangedAt = Instant.now();
+    }
+
+    // ========================================================================
+    // NAME CLEANER FOR SPELL CHECK
+    // ========================================================================
+    private String cleanNameForSpellCheck(String name) {
+        if (name == null) return null;
+        // Remove códigos hexadecimais de 6 caracteres no final
+        return name.replaceAll("[a-f0-9]{6}$", "").trim();
     }
 
     // ========================================================================
@@ -107,10 +121,11 @@ public class ProductDocument {
         return name;
     }
 
-    // mantém sincronização com nameSpell + uniqueKey
+    // mantém sincronização com nameSpell + uniqueKey + nameSpellClean
     public void setName(String name) {
         this.name = name;
         this.nameSpell = name;
+        this.nameSpellClean = cleanNameForSpellCheck(name); // ✅ ATUALIZA CAMPO LIMPO
         rebuildUniqueKey();
         markUpdated();
     }
@@ -155,6 +170,14 @@ public class ProductDocument {
         this.nameSpell = nameSpell;
     }
 
+    public String getNameSpellClean() {
+        return nameSpellClean;
+    }
+
+    public void setNameSpellClean(String nameSpellClean) {
+        this.nameSpellClean = nameSpellClean;
+    }
+
     public String getUniqueKey() {
         return uniqueKey;
     }
@@ -166,5 +189,4 @@ public class ProductDocument {
     public Instant getPriceChangedAt() {
         return priceChangedAt;
     }
-
 }
