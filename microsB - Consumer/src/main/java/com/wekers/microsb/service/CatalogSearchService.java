@@ -1,6 +1,5 @@
 package com.wekers.microsb.service;
 
-
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
@@ -18,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.HighlightQuery;
 import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
@@ -27,6 +27,9 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class CatalogSearchService {
 
@@ -34,6 +37,8 @@ public class CatalogSearchService {
     private final ElasticsearchClient esClient;
 
     private final ObjectMapper mapper = new ObjectMapper();
+
+    private static final String SEARCH_INDEX = "products_read";
 
     public CatalogSearchService(ElasticsearchOperations operations, ElasticsearchClient esClient) {
         this.operations = operations;
@@ -51,12 +56,28 @@ public class CatalogSearchService {
     ) {
 
         List<Query> must = new ArrayList<>();
+        final String originalQuery = query;
+        String correctedQuery = null;
+        List<String> suggestions = new ArrayList<>();
 
-        // Full-text fuzzy + boost
+        // SEMPRE verificar correção ortográfica
         if (query != null && !query.isBlank()) {
+            correctedQuery = correctQuery(query);
+            suggestions = getSpellSuggestionsList(query);
+
+            // ✅ CORREÇÃO: SEMPRE usa a correção se disponível
+            if (!suggestions.isEmpty() && !suggestions.get(0).equalsIgnoreCase(query)) {
+                correctedQuery = suggestions.get(0);
+                query = correctedQuery; // ✅ USA A CORREÇÃO NA BUSCA
+                log.info("🎯 Correção aplicada na busca: '{}' -> '{}'", originalQuery, correctedQuery);
+            } else {
+                correctedQuery = originalQuery; // Mantém original se não há correção
+            }
+
+            final String finalQuery = query;
             must.add(Query.of(q -> q.multiMatch(
                     MultiMatchQuery.of(m -> m
-                            .query(query)
+                            .query(finalQuery)
                             .fields("name.standard^3", "description^1")
                             .fuzziness("AUTO")
                     )
@@ -90,9 +111,6 @@ public class CatalogSearchService {
                 )
         );
 
-        HighlightQuery highlightQuery = new HighlightQuery(highlight, ProductDocument.class);
-
-
         var nativeQuery = NativeQuery.builder()
                 .withQuery(Query.of(q -> q.bool(boolQuery)))
                 .withPageable(PageRequest.of(page, size))
@@ -102,74 +120,124 @@ public class CatalogSearchService {
                 .withHighlightQuery(new HighlightQuery(highlight, ProductDocument.class))
                 .build();
 
-        var searchHits = operations.search(nativeQuery, ProductDocument.class);
+        var searchHits = operations.search(nativeQuery, ProductDocument.class, IndexCoordinates.of(SEARCH_INDEX));
 
+        // ✅ MELHORIA: Lógica aprimorada para sugestões
+        boolean hasNoResults = searchHits.getTotalHits() == 0;
+        boolean hasFewResults = searchHits.getTotalHits() <= 3;
 
+        List<String> finalSuggestions = suggestions;
 
-        // Se encontrou, beleza
-        if (searchHits.getTotalHits() > 0) {
-            return new CatalogSearchResponse(
-                    buildHighlightedResult(searchHits, page, size),
-                    List.of(),
-                    null
-            );
+        // ✅ Se não tem sugestões de spell check E tem poucos/nenhum resultado, busca sugestões de vocabulário
+        if ((hasNoResults || hasFewResults) && finalSuggestions.isEmpty()) {
+            finalSuggestions = suggestVocabulary();
 
+            // ✅ Fallback se ainda não tem sugestões
+            if (finalSuggestions.isEmpty()) {
+                finalSuggestions = getFallbackSuggestions();
+            }
         }
 
-        if (searchHits.getTotalHits() == 0) {
-            return new CatalogSearchResponse(
-                    new PageImpl<>(List.of(), PageRequest.of(page, size), 0),
-                    suggestVocabulary(),
-                    null
-            );
-        }
-
-
-        // Caso contrário → tentar correção
-        String corrected = correctQuery(query);
-
-        // Se a correção não mudou nada → retorna sugestões
-        if (corrected.equalsIgnoreCase(query)) {
+        // Se não encontrou resultados, retorna com sugestões
+        if (hasNoResults) {
             return new CatalogSearchResponse(
                     new PageImpl<>(List.of(), PageRequest.of(page, size), 0),
-                    suggestVocabulary(), // sugerimos termos úteis
-                    null // não houve correção
+                    finalSuggestions,
+                    correctedQuery
             );
         }
 
-        // Reexecuta a busca usando o termo corrigido
-        var correctedQuery = NativeQuery.builder()
-                .withQuery(Query.of(q -> q.multiMatch(
-                        MultiMatchQuery.of(m -> m
-                                .query(corrected)
-                                .fields("name^3", "description^1")
-                                .fuzziness("AUTO")
-                        )
-                )))
-                .withHighlightQuery(highlightQuery) // reutilize o mesmo highlight!
-                .withPageable(PageRequest.of(page, size))
-                .build();
+        // Encontrou resultados - retorna com sugestões e correção se aplicável
+        Page<ProductDocument> results = buildHighlightedResult(searchHits, page, size);
 
-        var correctedHits = operations.search(correctedQuery, ProductDocument.class);
+        // ✅ CORREÇÃO: Marca correção mesmo quando há resultados
+        if (correctedQuery != null && !correctedQuery.equalsIgnoreCase(originalQuery)) {
+            final String finalCorrectedQuery = correctedQuery;
+            results.getContent().forEach(item -> item.setCorrectedQuery(finalCorrectedQuery));
 
-        // Retorna resultados + informação da correção
-        var resultPage = buildHighlightedResult(correctedHits, page, size);
-        resultPage.getContent().forEach(item -> item.setCorrectedQuery(corrected));
+            log.info("🎯 Correção aplicada nos resultados: '{}' -> '{}' ({} resultados)",
+                    originalQuery, correctedQuery, searchHits.getTotalHits());
+        }
+
         return new CatalogSearchResponse(
-                resultPage,
-                List.of(corrected),
-                corrected
+                results,
+                finalSuggestions,
+                correctedQuery // ✅ Agora retorna a correção real
         );
+    }
 
+    private List<String> getSpellSuggestionsList(String query) {
+        if (query == null || query.isBlank()) return List.of();
 
+        try {
+            var transport = (co.elastic.clients.transport.rest_client.RestClientTransport) esClient._transport();
+            var low = transport.restClient();
+
+            String json = """
+        {
+          "suggest": {
+            "text": "%s",
+            "spell_suggestion": {
+              "term": {
+                "field": "nameSpellClean",
+                "size": 3,
+                "suggest_mode": "popular",
+                "max_edits": 2,
+                "prefix_length": 1,
+                "min_doc_freq": 1
+              }
+            }
+          }
+        }
+        """.formatted(query.replace("\"", "\\\""));
+
+            var request = new Request("POST", "/" + SEARCH_INDEX + "/_search");
+            request.setJsonEntity(json);
+
+            var response = low.performRequest(request);
+            var root = mapper.readTree(response.getEntity().getContent());
+
+            var suggest = root.path("suggest").path("spell_suggestion");
+            if (suggest.isArray() && suggest.size() > 0) {
+                var firstSuggestion = suggest.get(0);
+                var options = firstSuggestion.path("options");
+
+                if (options.isArray() && options.size() > 0) {
+                    List<String> suggestions = new ArrayList<>();
+                    for (var option : options) {
+                        String suggestion = option.path("text").asText();
+                        if (!suggestion.isBlank() && !suggestion.equalsIgnoreCase(query)) {
+                            suggestions.add(suggestion);
+                        }
+                    }
+                    log.debug("🔍 Spell suggestions para '{}': {}", query, suggestions);
+                    return suggestions;
+                }
+            }
+
+            log.debug("🔍 Nenhuma spell suggestion para '{}'", query);
+            return List.of();
+
+        } catch (Exception e) {
+            log.error("Error getting spell suggestions for '{}': {}", query, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private String correctQuery(String originalQuery) {
+        if (originalQuery == null || originalQuery.isBlank()) return originalQuery;
+
+        List<String> suggestions = getSpellSuggestionsList(originalQuery);
+
+        // Retorna a primeira sugestão se existir, senão retorna o original
+        return suggestions.isEmpty() ? originalQuery : suggestions.get(0);
     }
 
     private List<String> suggestVocabulary() {
         try {
             var query = NativeQuery.builder()
-                    .withQuery(Query.of(q -> q.exists(e -> e.field("name"))))
-                    .withPageable(PageRequest.of(0, 50)) // ✅ Aumentei para 50
-                    .withFields("name") // ✅ Busca apenas o campo name
+                    .withQuery(q -> q.matchAll(m -> m))
+                    .withPageable(PageRequest.of(0, 100))
                     .build();
 
             var hits = operations.search(query, ProductDocument.class);
@@ -178,73 +246,46 @@ public class CatalogSearchService {
                     .stream()
                     .map(hit -> hit.getContent().getName())
                     .filter(name -> name != null && !name.trim().isEmpty())
+                    .map(this::extractMainProductTerm) // ✅ Extrai termos principais
+                    .filter(term -> term != null && term.length() >= 3) // ✅ Filtra termos muito curtos
                     .distinct()
                     .sorted()
-                    .limit(20) // Limita para 20 sugestões
+                    .limit(15) // ✅ Mais sugestões
                     .toList();
 
         } catch (Exception e) {
-            System.err.println("Erro no suggestVocabulary: " + e.getMessage());
-            return List.of();
+            log.error("Erro no suggestVocabulary: {}", e.getMessage());
+            return getFallbackSuggestions(); // ✅ Usa fallback em caso de erro
         }
     }
 
-    private String correctQuery(String originalQuery) {
-        if (originalQuery == null || originalQuery.isBlank()) return originalQuery;
+    // ✅ MÉTODO: Extrai termos principais dos nomes dos produtos
+    private String extractMainProductTerm(String productName) {
+        if (productName == null) return null;
 
-        try {
-            var transport = (co.elastic.clients.transport.rest_client.RestClientTransport) esClient._transport();
-            var low = transport.restClient();
+        // Remove códigos hexadecimais
+        String cleanName = productName.replaceAll("[a-f0-9]{6}$", "").trim();
 
-            // JSON corrigido para spellcheck
-            String json = """
-        {
-          "suggest": {
-            "text": "%s",
-            "simple_phrase": {
-              "phrase": {
-                "field": "name_spell",
-                "size": 1,
-                "gram_size": 2,
-                "direct_generator": [{
-                  "field": "name_spell",
-                  "suggest_mode": "popular"
-                }],
-                "highlight": {
-                  "pre_tag": "<em>",
-                  "post_tag": "</em>"
-                }
-              }
+        // Extrai a primeira palavra significativa
+        String[] words = cleanName.split("\\s+");
+        if (words.length > 0) {
+            String firstWord = words[0];
+            // Retorna apenas se for uma palavra significativa (não contém números)
+            if (firstWord.length() >= 3 && !firstWord.matches(".*\\d.*")) {
+                return firstWord.toLowerCase();
             }
-          }
         }
-        """.formatted(originalQuery.replace("\"", "\\\""));
 
-            var request = new Request("POST", "/products/_search");
-            request.setJsonEntity(json);
-
-            var response = low.performRequest(request);
-            var root = mapper.readTree(response.getEntity().getContent());
-
-            var suggest = root.path("suggest").path("simple_phrase");
-            if (suggest.isArray() && suggest.size() > 0) {
-                var options = suggest.get(0).path("options");
-                if (options.isArray() && options.size() > 0) {
-                    var suggestion = options.get(0).path("text").asText();
-                    if (!suggestion.isBlank() && !suggestion.equalsIgnoreCase(originalQuery)) {
-                        return suggestion;
-                    }
-                }
-            }
-
-            return originalQuery;
-
-        } catch (Exception e) {
-            System.err.println("Erro no correctQuery: " + e.getMessage());
-            return originalQuery;
-        }
+        // Fallback: retorna o nome limpo em lowercase
+        return cleanName.toLowerCase();
     }
 
+    // ✅ MÉTODO: Sugestões de fallback
+    private List<String> getFallbackSuggestions() {
+        return List.of("headset", "notebook", "monitor", "teclado", "mouse",
+                "ssd", "processador", "placa de vídeo", "memória", "fonte",
+                "gabinete", "water cooler", "ventoinha", "hub", "cabo");
+    }
 
     private Page<ProductDocument> buildHighlightedResult(
             SearchHits<ProductDocument> searchHits, int page, int size) {
@@ -262,7 +303,4 @@ public class CatalogSearchService {
 
         return new PageImpl<>(results, PageRequest.of(page, size), searchHits.getTotalHits());
     }
-
-
-
 }
