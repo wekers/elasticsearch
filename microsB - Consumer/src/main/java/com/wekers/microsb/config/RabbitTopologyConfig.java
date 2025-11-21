@@ -53,7 +53,11 @@ public class RabbitTopologyConfig {
 
     @Bean
     public Queue deadQueue() {
-        return QueueBuilder.durable(properties.getQueues().getDead()).build();
+        long TTL_14_DIAS = 14L * 24 * 60 * 60 * 1000; // 14 dias em ms
+
+        return QueueBuilder.durable(properties.getQueues().getDead())
+                .withArgument("x-message-ttl", TTL_14_DIAS)
+                .build();
     }
 
     // ============================================================
