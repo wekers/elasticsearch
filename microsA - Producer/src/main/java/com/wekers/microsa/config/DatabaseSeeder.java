@@ -7,8 +7,6 @@ import com.wekers.microsa.repository.ProductJpaRepository;
 import com.wekers.microsa.service.ProductProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +14,6 @@ import org.springframework.context.annotation.Configuration;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Properties;
 
 @Slf4j
 @Configuration
@@ -26,8 +23,7 @@ public class DatabaseSeeder {
     private final ProductJpaRepository repository;
     private final ProductProducer producer;
     private final ObjectMapper mapper;
-    private final RabbitMQProperties properties;
-    private final ConnectionFactory connectionFactory;
+    private final RabbitQueueAvailable queueAvailable;
 
     @Bean
     public ApplicationRunner runSeeder() {
@@ -42,7 +38,7 @@ public class DatabaseSeeder {
             log.info("🚀 Running DATABASE SEED...");
 
             // VERIFICAÇÃO DIRETA: Microservice B já criou queues?
-            if (!isMicroserviceBQueueAvailable()) {
+            if (!queueAvailable.isMicroserviceBQueueAvailable()) {
                 log.error("❌ MICROSERVICE B NEVER STARTED - No RabbitMQ structures found");
                 log.error("🚫 SEED ABORTED - Start Microservice B first");
                 return; // PARA TUDO
@@ -76,32 +72,6 @@ public class DatabaseSeeder {
             log.info("✅ SEED completed with {} products inserted! {} events sent to RabbitMQ.",
                     seedData.size(), eventsSentCount);
         };
-    }
-
-    /**
-     * VERIFICAÇÃO DIRETA: Checa se a queue específica do Microservice B existe
-     */
-    private boolean isMicroserviceBQueueAvailable() {
-        RabbitAdmin admin = new RabbitAdmin(connectionFactory);
-
-        try {
-            // A queue abaixo foi criada pelo Microservice B?
-            String microserviceBQueueName = properties.getRoutingKeys().getCreated() + ".queue";
-
-            Properties queueProps = admin.getQueueProperties(microserviceBQueueName);
-
-            if (queueProps != null) {
-                log.info("✅ Microservice B queue '{}' is available", microserviceBQueueName);
-                return true;
-            } else {
-                log.error("❌ Microservice B queue '{}' not found", microserviceBQueueName);
-                return false;
-            }
-
-        } catch (Exception e) {
-            log.error("❌ Cannot connect to RabbitMQ: {}", e.getMessage());
-            return false;
-        }
     }
 
     // DTO interno para leitura do JSON
