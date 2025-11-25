@@ -1,129 +1,132 @@
-##################################################################################
-# Microservice A - Create Products
-### parameters
-### Criar produto no Microserviço A - Create product in Microservice A
+###################################################################################
+# MICRO SERVIÇO A — PRODUTOS (POSTGRESQL + RabbitMQ)
+###################################################################################
 
+### Health Check
+GET http://localhost:8080/products/health
+
+
+### Criar produto 1
 POST http://localhost:8080/products
 Content-Type: application/json
 
 {
-"name":"Notebook Gamer",
-"description":"RTX 4060 16GB",
-"price":4500
+  "name": "Notebook Gamer",
+  "description": "RTX 4060 16GB",
+  "price": 4500
 }
 
-###
+### Criar produto 2
 POST http://localhost:8080/products
 Content-Type: application/json
 
 {
-"name":"Notebook Lenovo Ryzen",
-"description":"Memory 24GB",
-"price":3800
+  "name": "Notebook Lenovo Ryzen",
+  "description": "Memory 24GB",
+  "price": 3800
 }
 
-###
+### Criar produto 3
 POST http://localhost:8080/products
 Content-Type: application/json
 
 {
-"name":"Monitor LCD 27",
-"description":"AOC 27 Polegadas 5ms",
-"price":989.80
+  "name": "Monitor LCD 27",
+  "description": "AOC 27 Polegadas 5ms",
+  "price": 989.80
 }
 
-###
+### Criar produto 4
 POST http://localhost:8080/products
 Content-Type: application/json
 
 {
-  "name":"Mouse Razer",
-  "description":"DeathAdder Elite",
-  "price":523.06
+  "name": "Mouse Razer",
+  "description": "DeathAdder Elite",
+  "price": 523.06
 }
 
-##################################################################################
-# Microservice A - Delete Product
-### parameters
-### Criar produto no Microserviço A - Create product in Microservice A
-DELETE http://localhost:8080/products/c7fcf6c7-907f-4d18-bf9c-7cac9867dcfc
+### Buscar por ID
+@uuid = ecf418ea-9df3-4079-98f4-276b99eafb07
+GET http://localhost:8080/products/{{uuid}}
 
-##################################################################################
-# Microservice A - Update Product
-### parameters
-### CUpdate produto no Microserviço A - Update product in Microservice A
-PUT http://localhost:8080/products/09f74e9a-0be8-42c3-8b22-e4ac137c4f42
+### Listar todos (PostgreSQL)
+GET http://localhost:8080/products
+
+### Deletar produto
+DELETE http://localhost:8080/products/{{uuid}}
+
+### Atualizar produto
+PUT http://localhost:8080/products/{{uuid}}
 Content-Type: application/json
 
 {
-"name":"Notebook Gamer 2",
-"description":"RTX 4070 16GB",
-"price":4600.00
+  "name": "Notebook Gamer B2",
+  "description": "RTX 4070 24GB",
+  "price": 4950.00
 }
 
-##################################################################################
-# Microservice B - Health Check
-### Health Check Microservice B
+###################################################################################
+# MICRO SERVIÇO B — CATÁLOGO (Elasticsearch)
+###################################################################################
+
+### Health Check
 GET http://localhost:8081/catalogo/suggest-health
 
+###################################################################################
+# BUSCA BÁSICA
+###################################################################################
 
-#################################################################################
-# Basic Search Microservice B
-### Basic Search
+### Search simples
+GET http://localhost:8081/catalogo/search?query=rtx
 
-### Busca por texto - Search by text
-GET http://localhost:8081/search/products/rtx
+### Busca by ID
+@lastId = ecf418ea-9df3-4079-98f4-276b99eafb07
+GET http://localhost:8081/catalogo/products/{{lastId}}
 
-### Busca com erro de digitação (fuzzy) - search with error of typing
-GET http://localhost:8081/search/products/gammer
+### Busca com erro de digitação (fuzzy)
+GET http://localhost:8081/catalogo/search?query=tecado
 
-### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
-GET http://localhost:8081/search/products/notibook
+### Busca com erro (fuzzy)
+GET http://localhost:8081/catalogo/search?query=notibook
 
-###
-GET http://localhost:8081/search/products/lcd
-
-### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
-GET http://localhost:8081/search/products/minitor
-
-### listar todos - list all
-GET http://localhost:8081/search/products/listar-todos
-
-
-
-################################################################################
-# Advanced Search Microservice B
-### Catalogo - Catalog Complete Search with Pagination and Suggestions
-### Busca por texto - Search by text
-GET http://localhost:8081/catalogo/search?query=gamer
-
-### Busca com erro de digitação (fuzzy) - search with error of typing
-GET http://localhost:8081/catalogo/search?query=gammer
-
-### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
-GET http://localhost:8081/catalogo/search?query=notbuk
-
-### Erro na digitação feio, não encontrado, então sugesões - bad typing, error, not found, then suggestions
-GET http://localhost:8081/catalogo/search?query=minor
-
-### Faixa de preço - Price range
-GET http://localhost:8081/catalogo/search?minPrice=3000&maxPrice=6000
-
-### Ordenação - Sorting descending
-GET http://localhost:8081/catalogo/search?sort=price&direction=desc
-
-### Buscar tudo ao mesmo tempo - Search all at the same time
-GET http://localhost:8081/catalogo/search?query=noti&minPrice=3000&maxPrice=6000&page=0&size=5&sort=price,asc
-
-### Buscar todos - List all
+### Listar tudo
 GET http://localhost:8081/catalogo/search
 
+###################################################################################
+# BUSCA AVANÇADA — PAGINAÇÃO, ORDEM, CORREÇÃO (SPELLCHECK)
+###################################################################################
+
+### Busca texto
+GET http://localhost:8081/catalogo/search?query=headset
+
+### Fuzzy typing
+GET http://localhost:8081/catalogo/search?query=hedsett
+
+### Fuzzy
+GET http://localhost:8081/catalogo/search?query=monitr
+
+### Erro feio (retorna sugestões)
+GET http://localhost:8081/catalogo/search?query=notbuk
+
+### Filtro por preço
+GET http://localhost:8081/catalogo/search?minPrice=3000&maxPrice=6000
+
+### Ordenação DESC
+GET http://localhost:8081/catalogo/search?sort=price&direction=desc
+
+### Tudo junto
+GET http://localhost:8081/catalogo/search?query=notebook&minPrice=3000&maxPrice=6000&page=0&size=5&sort=price&direction=asc
+
+### Pode utilizar também o formato abaixo para ordenação
 ###?sort=price,asc
 ###?sort=price,desc
 ###?sort=name,asc
 ###?sort=name,desc
 
+###################################################################################
+# AUTOCOMPLETE
+###################################################################################
 
-# Autocomplete
+### Autocomplete
 GET http://localhost:8081/catalogo/suggest?prefix=no
-
