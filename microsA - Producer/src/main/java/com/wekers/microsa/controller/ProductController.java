@@ -1,74 +1,53 @@
 package com.wekers.microsa.controller;
 
-import com.wekers.microsa.entity.ProductEntity;
+
+import com.wekers.microsa.dto.ProductRequest;
+import com.wekers.microsa.dto.ProductResponse;
 import com.wekers.microsa.service.ProductService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/products")
+@RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService service;
-
-    public ProductController(ProductService service) {
-        this.service = service;
-    }
 
     // ============================================================
     // CREATE
     // ============================================================
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody ProductEntity product) {
-        try {
-            ProductEntity created = service.create(product);
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
+        ProductResponse created = service.create(request);
+        // 201 + corpo com { "id": ..., "name": ... }
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Produto criado e publicado com sucesso!");
-            response.put("product", created);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "error", "Erro interno ao criar o produto",
-                            "details", e.getMessage()
-                    ));
-        }
+    // ============================================================
+    // READ (by id)
+    // ============================================================
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductResponse> getById(@PathVariable UUID id) {
+        ProductResponse product = service.getById(id);
+        return ResponseEntity.ok(product);
     }
 
     // ============================================================
     // UPDATE
     // ============================================================
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ProductEntity product) {
-        try {
-            ProductEntity updated = service.update(id, product);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Produto atualizado e evento publicado com sucesso!");
-            response.put("product", updated);
-
-            return ResponseEntity.ok(response);
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "error", "Erro interno ao atualizar o produto",
-                            "details", e.getMessage()
-                    ));
-        }
+    public ResponseEntity<ProductResponse> update(@PathVariable UUID id,
+                                                  @Valid @RequestBody ProductRequest request) {
+        ProductResponse updated = service.update(id, request);
+        return ResponseEntity.ok(updated);
     }
 
     // ============================================================
@@ -76,22 +55,11 @@ public class ProductController {
     // ============================================================
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
-        try {
-            service.delete(id);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Produto removido com sucesso!",
-                    "id", id
-            ));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "error", "Erro interno ao remover o produto",
-                            "details", e.getMessage()
-                    ));
-        }
+        service.delete(id);
+        return ResponseEntity.ok(Map.of(
+                "message", "Produto removido com sucesso!",
+                "id", id
+        ));
     }
 
     // ============================================================
@@ -99,7 +67,7 @@ public class ProductController {
     // ============================================================
     @GetMapping
     public ResponseEntity<?> listAll() {
-        List<ProductEntity> products = service.listAll();
+        List<ProductResponse> products = service.listAll();
         if (products.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }
