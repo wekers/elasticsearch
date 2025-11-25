@@ -15,4 +15,6 @@ public interface ProductJpaRepository extends JpaRepository<ProductEntity, UUID>
 
     // Buscar um produto específico pelo nome + descrição
     Optional<ProductEntity> findByNameAndDescription(String name, String description);
+
+    Optional<ProductEntity> findByNameAndDescriptionAndIdNot(String name, String description, UUID id);
 }
