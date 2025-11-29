@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./banner.png" alt="Wekers Distributed Catalog Banner" width="100%">
+</p>
+
 # 📘 Wekers - Elasticsearch Microsserviço A/B
 
 ![Java](https://img.shields.io/badge/Java-21-blue)
@@ -11,9 +15,8 @@
 
 ---
 ## 🌐 Language
-- [Versão em Português do conteúdo do README](README_PT.md) <br/>
-- [English version of the README content](https://github.com/wekers/elasticsearch)
-
+- 🇧🇷 Você está lendo a versão em Português.
+- 🇺🇸 [English version](https://github.com/wekers/elasticsearch)
 ---
 
 ## 📑 Sumário
@@ -41,25 +44,26 @@
 ---
 
 ## 🎯 Visão Geral
+Este projeto demonstra um **Catálogo Distribuído** de busca avançada, autocomplete, correção ortográfica, indexação assíncrona, DLQ, Retry, seed inteligente, dashboard de filas e Scripts de Manutenção DevOps, dividido em:
 
-#### **Sistema distribuído com RabbitMQ, Spring Boot, PostgreSQL, Elasticsearch 8+, Autocomplete, Correção ortográfica, Index Versioning, Retry/DLX, Dashboard de filas, Seed inteligente e scripts DevOps.**
 
-Este projeto implementa um **ecossistema completo de catalogação distribuída**.  
-**produção → mensageria → indexação → busca**  
-Ideal para catálogos, e-commerce, ERP e sistemas que exigem **alta performance de consulta** e **resiliência**, com:
+#### **Microsserviço A (Producer)**
 
-✔ **Persistência confiável no PostgreSQL (Microserviço A)**  
-✔ **Mensageria assíncrona via RabbitMQ (durável, resiliente)**  
-✔ **Indexação, busca avançada e autocomplete via Elasticsearch (Microserviço B)**  
-✔ **Retry automático, Dead Letter Queue, Deleted Queue**  
-✔ **Scripts automáticos de migração, reset, upgrade e versionamento de índice**  
-✔ **Índice versionado (`products_v1`, `v2`, `v3`...)**  
-✔ **Backup/restore de PostgreSQL e Elasticsearch**  
-✔ **Dashboard real-time das filas com auto-refresh** customizado em /queues  
-✔ **Search PRO com fuzzy, highlight, range, sorting e spell-correction**  
-✔ **Autocomplete na barra de busca** acessível via navegador em /autocomplete.html
+- CRUD do PostgreSQL
+- Envio de eventos para o RabbitMQ
+- Seed automático de 500 produtos
 
-> Projeto feito sob medida para estudos de: integração assíncrona, mensageria resiliente, sincronização entre bancos e observabilidade de filas.
+#### **Microsserviço B (Consumer)**
+
+- Consome mensagens do RabbitMQ
+- Indexa produtos no Elasticsearch
+- Fornece APIs de:
+    - /search/products
+    - /catalogo/search
+    - /catalogo/suggest
+    - Autocomplete PRO (edge-ngram + wildcard)
+    - Correção ortográfica (spellcheck)
+    - Filtro por preço, ordenação e paginação
 
 ---
 
@@ -91,101 +95,101 @@ Ideal para catálogos, e-commerce, ERP e sistemas que exigem **alta performance 
 
 ```mermaid
 flowchart TD
-    subgraph CLIENTE [Cliente]
-        User[👤 Usuário Final<br/>Front-end, API Client]
-    end
-    
-    subgraph APLICACAO [Sistema de Catálogo]
-        Producer[📝 Producer Service<br/>Microserviço A]
-        Search[🔍 Search Service<br/>Microserviço B]
-        RMQ[📨 RabbitMQ<br/>Message Broker]
-    end
-    
-    subgraph DATA [Data Layer]
-        PG[(💾 PostgreSQL<br/>Dados Transacionais)]
-        ES[(📊 Elasticsearch<br/>Índice de Busca)]
-    end
-    
-    User -->|HTTP: Operações CRUD| Producer
-    User -->|HTTP: Buscas & Consultas| Search
-    Producer -->|JPA/Hibernate| PG
-    Producer -->|Eventos Assíncronos| RMQ
-    RMQ -->|Consumo de Eventos| Search
-    Search -->|Queries & Indexação| ES
-    
-    style CLIENTE fill:#e1f5fe
-    style APLICACAO fill:#f3e5f5
-    style DATA fill:#e8f5e8
-    style Producer fill:#e1bee7
-    style Search fill:#c8e6c9
-    style RMQ fill:#ffcdd2
+subgraph CLIENTE [Cliente]
+User[👤 Usuário Final<br/>Front-end, API Client]
+end
+
+subgraph APLICACAO [Sistema de Catálogo]
+Producer[📝 Producer Service<br/>Microserviço A]
+Search[🔍 Search Service<br/>Microserviço B]
+RMQ[📨 RabbitMQ<br/>Message Broker]
+end
+
+subgraph DATA [Data Layer]
+PG[(💾 PostgreSQL<br/>Dados Transacionais)]
+ES[(📊 Elasticsearch<br/>Índice de Busca)]
+end
+
+User -->|HTTP: Operações CRUD| Producer
+User -->|HTTP: Buscas & Consultas| Search
+Producer -->|JPA/Hibernate| PG
+Producer -->|Eventos Assíncronos| RMQ
+RMQ -->|Consumo de Eventos| Search
+Search -->|Queries & Indexação| ES
+
+style CLIENTE fill:#e1f5fe
+style APLICACAO fill:#f3e5f5
+style DATA fill:#e8f5e8
+style Producer fill:#e1bee7
+style Search fill:#c8e6c9
+style RMQ fill:#ffcdd2
 ```
 ### C4 – Level 2 (Containers)
 ```mermaid
     flowchart TB
-        User[User]
-        
-        subgraph MicroA[Microservice A]
-            A1[ProductController]
-            A2[ProductService]
-            A3[ProductProducer]
-        end
-        
-        subgraph MicroB[Microservice B]
-            B1[CatalogController]
-            B2[SearchService]
-            B3[AutocompleteService]
-        end
-        
-        subgraph Infra[Infrastructure]
-            PG[(PostgreSQL)]
-            ES[(Elasticsearch)]
-            RMQ[RabbitMQ]
-        end
-    
-        User --> A1
-        User --> B1
-        A1 --> A2
-        A2 --> A3
-        A2 --> PG
-        A3 --> RMQ
-        B1 --> B2
-        B2 --> ES
-        RMQ --> B2
-        B1 --> B3
-        B3 --> ES
-    
-        style MicroA fill:#e6f3ff,stroke:#1e90ff
-        style MicroB fill:#e6ffe6,stroke:#32cd32
-        style Infra fill:#fffaf0,stroke:#daa520
+    User[User]
+
+    subgraph MicroA[Microservice A]
+        A1[ProductController]
+        A2[ProductService]
+        A3[ProductProducer]
+    end
+
+    subgraph MicroB[Microservice B]
+        B1[CatalogController]
+        B2[SearchService]
+        B3[AutocompleteService]
+    end
+
+    subgraph Infra[Infrastructure]
+        PG[(PostgreSQL)]
+        ES[(Elasticsearch)]
+        RMQ[RabbitMQ]
+    end
+
+    User --> A1
+    User --> B1
+    A1 --> A2
+    A2 --> A3
+    A2 --> PG
+    A3 --> RMQ
+    B1 --> B2
+    B2 --> ES
+    RMQ --> B2
+    B1 --> B3
+    B3 --> ES
+
+    style MicroA fill:#e6f3ff,stroke:#1e90ff
+    style MicroB fill:#e6ffe6,stroke:#32cd32
+    style Infra fill:#fffaf0,stroke:#daa520
 ```
 ### 🔁 Fluxo Completo (Sequence Diagram)
 ```mermaid
     sequenceDiagram
-        participant User as User
-        participant Client as Client
-        participant A as Micro A (PostgreSQL)
-        participant RMQ as RabbitMQ
-        participant B as Micro B (Consumer)
-        participant ES as Elasticsearch
-    
-        Note over User,B: Fluxo de Escrita
-        User->>A: POST /products {dados}
-        A->>A: Salva produto no PostgreSQL
-        A->>RMQ: Publica evento CREATED/UPDATED/DELETED
-        Note over RMQ: Exchange: products.exchange<br/>Routing Key: products.created/updated/deleted
-        
-        B->>RMQ: Consome evento (manual ACK)
-        B->>B: idempotence check + uniqueKey
-        B->>ES: Indexa documento no alias "products_write"
-        ES-->>B: OK
-        B-->>RMQ: ACK mensagem
-    
-        Note over Client,B: Fluxo de Consulta
-        Client->>B: GET /catalog/search?query=...
-        B->>ES: Search com highlight
-        ES-->>B: Resultados + sugestões
-        B-->>Client: JSON response
+    participant User as User
+    participant Client as Client
+    participant A as Micro A (PostgreSQL)
+    participant RMQ as RabbitMQ
+    participant B as Micro B (Consumer)
+    participant ES as Elasticsearch
+
+    Note over User,B: Fluxo de Escrita
+    User->>A: POST /products {dados}
+    A->>A: Salva produto no PostgreSQL
+    A->>RMQ: Publica evento CREATED/UPDATED/DELETED
+    Note over RMQ: Exchange: products.exchange<br/>Routing Key: products.created/updated/deleted
+
+    B->>RMQ: Consome evento (manual ACK)
+    B->>B: idempotence check + uniqueKey
+    B->>ES: Indexa documento no alias "products_write"
+    ES-->>B: OK
+    B-->>RMQ: ACK mensagem
+
+    Note over Client,B: Fluxo de Consulta
+    Client->>B: GET /catalogo/search?query=...
+    B->>ES: Search com highlight
+    ES-->>B: Resultados + sugestões
+    B-->>Client: JSON response
 ```
 * * *
 
@@ -246,7 +250,7 @@ cd "../microsA - Producer"
 
 Baixe os arquivos na raiz do projeto para testar:
 
-*   [`postman_collection.json`](https://github.com/wekers/elasticsearch/blob/main/Wekers%2520Elasticsearch%2520uServ%2520A-B.postman_collection.json)
+*   [`postman_collection.json`](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/Wekers-Elasticsearch-uServ-A-B.postman_collection.json)
 
 *   [`api.http`](https://github.com/wekers/elasticsearch/blob/main/api.http)
 
@@ -266,13 +270,38 @@ Baixe os arquivos na raiz do projeto para testar:
 | **GET** | `/catalogo/products/{id}` | B | Busca por ID |
 | **GET** | `/queues` | B | Dashboard filas |
 
+### 🔌 Portas dos serviços
+```bash
+- 8080 → Microserviço A
+- 8081 → Microserviço B
+- 5435 → PostgreSQL
+- 5672 / 15672 → RabbitMQ
+- 9200 → Elasticsearch
+- 5601 → Kibana
+```
+
 ### 📲 Criar produto:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/api_http_1.png)
 
 ### 📲 Buscar produto (com erro de digitação):
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/api_http_2.png)
 
-### 📲 Postman Example:
+### ✨ Fluxo da busca
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant B as Microserviço B
+    participant ES as Elasticsearch
+
+    U->>B: GET /catalogo/search?query=notbuk
+    B->>ES: fuzzy + multi_match query
+    ES-->>B: 0 resultados
+    B->>ES: spellcheck via _search suggest
+    ES-->>B: "notebook"
+    B-->>U: resultados corrigidos + highlight
+```
+### 📲 Postman Exemplo com erro de digitação:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/postman_1.png)
 
 * * *
@@ -334,13 +363,26 @@ sequenceDiagram
 
 **Responsabilidades:**
 
-*   Consumo de eventos RabbitMQ
+- Consumir eventos do RabbitMQ:
+- Sincronizar índice de catálogo no Elasticsearch.
+- Expor APIs de busca:
+    - `/catalogo/products/{id}` (busca por Id)
+    - `/catalogo/search` (paginado + filtros + highlight + spellcheck)
+    - `/catalogo/suggest` (autocomplete)
+    - `/queues` (dashboard HTML de filas)
+    - `/queues/api/*` (APIs internas para o dashboard)
 
-*   Indexação no Elasticsearch
+✔ Cria toda topologia RabbitMQ automaticamente  
+✔ Processamento idempotente  
+✔ Optimistic Locking baseado em versão  
+✔ Criação de `unique_key` para evitar duplicidades  
+✔ Indexação PRO no Elasticsearch  
+✔ Highlight (HTML)  
+✔ Correção ortográfica (sugestão de frases)  
+✔ Busca fuzzy, range, sorting, pagination  
+✔ Autocomplete (edge-ngram + phrase-prefix + wildcard fallback)
+✔ Dashboard de monitoramento
 
-*   APIs de busca avançada
-
-*   Dashboard de monitoramento
 
 
 **🔍 Busca PRO:**
@@ -397,21 +439,21 @@ sequenceDiagram
 ### Fluxo Retry + DLQ
 ```mermaid
     sequenceDiagram
-        participant B as Microserviço B
-        participant R as RabbitMQ
-        participant Q as Queue Created
-        participant Re as Retry Queue
-        participant DLQ as Dead Letter Queue
-    
-        B->>Q: consume message
-        B-->>Q: error → NACK
-        Q->>Re: routed to Retry
-        Re-->>Q: after 5s TTL expire
-        Q->>B: process again
-        B-->>DLQ: after 3 attempts → DLX 
+    participant B as Microserviço B
+    participant R as RabbitMQ
+    participant Q as Queue Created
+    participant Re as Retry Queue
+    participant DLQ as Dead Letter Queue
+
+    B->>Q: consume message
+    B-->>Q: error → NACK
+    Q->>Re: routed to Retry
+    Re-->>Q: after 5s TTL expire
+    Q->>B: process again
+    B-->>DLQ: after 3 attempts → DLX 
 ```
 **Acesso UI:** `http://localhost:15672` (guest/guest)</br>
-RabbitMQ PrintScreen:</br>
+RabbitMQ PrintScreen:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/rabbitMQ_1.png)
 
 * * *
@@ -469,13 +511,14 @@ Visualização via web browser:</br>
 cd "microsB - Consumer"
 sh scripts/reset-index.sh
 ```
-PrintScreen:</br>
+PrintScreen:
 ![reset_index](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/script_reset-index.png)
 ```bash    
 # Upgrade de versão (zero downtime)
 sh scripts/upgrade-index.sh
 ```
-PrintScreen:</br>
+PrintScreen:
+
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/script_upgrade-index.png)
 
 ### Quando Usar Upgrade?
@@ -499,14 +542,14 @@ PrintScreen:</br>
 cd scripts
 sh backup_postgres.sh
 ```
-PrintScreen:</br>
+PrintScreen:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/backup_postgresql.png)
 
 **Restore:**
 ```bash
 gunzip < postgres_backup_2025-11-17_14-00-00.sql.gz | docker exec -i postgres psql -U microsa microsa
 ```
-PrintScreen:</br>
+PrintScreen:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/restore_backup_postgresql.png)
 
 ### Elasticsearch
@@ -517,21 +560,21 @@ cd scripts
 sh elastic_backup_setup.sh
 sh backup_elasticsearch.sh
 ```
-PrintScreen:</br>
+PrintScreen:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/backup_Elasticsearch.png)
 
 **Restore Interativo:**
 ```bash
 sh elastic_restore_manager.sh
 ```
-PrintScreen:</br>
+PrintScreen:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/restore_backup_Elasticsearch_2.png)
 
 **Restore Individual:**
 ```bash
 sh restore_elasticsearch.sh snapshot_xxx
 ```
-PrintScreen:</br>
+PrintScreen:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/restore_backup_Elasticsearch_1.png)  
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/restore_backup_Elasticsearch_3.png)
 
@@ -646,12 +689,12 @@ curl -s http://localhost:9200/_snapshot/my_backup/_all?pretty
 
 *   **PostgreSQL**: `localhost:5435` (user: microsa, pass: microsa)
 
-*   **Postman**: [`postman_collection.json`](https://Wekers%2520Elasticsearch%2520uServ%2520A-B.postman_collection.json)
+*   **Postman**: [`postman_collection.json`](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/Wekers-Elasticsearch-uServ-A-B.postman_collection.json)
 
 
 * * *
 
-📄 Licença
+📄 Licença / Uso
 ----------
 
 MIT – Livre para estudos, melhorias e uso profissional.
@@ -659,9 +702,7 @@ MIT – Livre para estudos, melhorias e uso profissional.
 Sinta‑se à vontade para:
 
 *   clonar
-
 *   alterar
-
 *   adaptar para outros domínios (ex: catálogo de livros, filmes, etc.)
 
 
