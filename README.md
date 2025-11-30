@@ -92,106 +92,19 @@ This project demonstrates a **Distributed Catalog** with advanced search, autoco
 
 ### C4 – Level 1 (System Context)
 
-```mermaid
-flowchart TD
-    subgraph CLIENT [Client]
-        User[👤 End User<br/>Front-end, API Client]
-    end
+![C4 Level 1](docs/diagrams/c4-level-1-system-context-en.png)
 
-    subgraph APP [Catalog System]
-        Producer[📝 Producer Service<br/>Microservice A]
-        Search[🔍 Search Service<br/>Microservice B]
-        RMQ[📨 RabbitMQ<br/>Message Broker]
-    end
-
-    subgraph DATA [Data Layer]
-        PG[(💾 PostgreSQL<br/>Transactional Data)]
-        ES[(📊 Elasticsearch<br/>Search Index)]
-    end
-
-    User -->|HTTP: CRUD Operations| Producer
-    User -->|HTTP: Searches & Queries| Search
-    Producer -->|JPA/Hibernate| PG
-    Producer -->|Async Events| RMQ
-    RMQ -->|Event Consumption| Search
-    Search -->|Queries & Indexing| ES
-
-    style CLIENT fill:#e1f5fe
-    style APP fill:#f3e5f5
-    style DATA fill:#e8f5e8
-    style Producer fill:#e1bee7
-    style Search fill:#c8e6c9
-    style RMQ fill:#ffcdd2
-```
+---
 
 ### C4 – Level 2 (Containers)
-```mermaid
-flowchart TB
-    User[User]
 
-    subgraph MicroA[Microservice A]
-        A1[ProductController]
-        A2[ProductService]
-        A3[ProductProducer]
-    end
+![C4 Level 2](docs/diagrams/c4-level-2-containers-en.png)
 
-    subgraph MicroB[Microservice B]
-        B1[CatalogController]
-        B2[SearchService]
-        B3[AutocompleteService]
-    end
-
-    subgraph Infra[Infrastructure]
-        PG[(PostgreSQL)]
-        ES[(Elasticsearch)]
-        RMQ[RabbitMQ]
-    end
-
-    User --> A1
-    User --> B1
-    A1 --> A2
-    A2 --> A3
-    A2 --> PG
-    A3 --> RMQ
-    B1 --> B2
-    B2 --> ES
-    RMQ --> B2
-    B1 --> B3
-    B3 --> ES
-
-    style MicroA fill:#e6f3ff,stroke:#1e90ff
-    style MicroB fill:#e6ffe6,stroke:#32cd32
-    style Infra fill:#fffaf0,stroke:#daa520
-```
+---
 
 ### 🔁 End-to-End Flow (Sequence Diagram)
-```mermaid
-sequenceDiagram
-    participant User as User
-    participant Client as Client
-    participant A as Micro A (PostgreSQL)
-    participant RMQ as RabbitMQ
-    participant B as Micro B (Consumer)
-    participant ES as Elasticsearch
 
-    Note over User,B: Write Flow
-    User->>A: POST /products {data}
-    A->>A: Persist product in PostgreSQL
-    A->>RMQ: Publish CREATED/UPDATED/DELETED event
-    Note over RMQ: Exchange: products.exchange<br/>Routing Key: products.created/updated/deleted
-
-    B->>RMQ: Consume event (manual ACK)
-    B->>B: idempotency check + uniqueKey
-    B->>ES: Index document into alias "products_write"
-    ES-->>B: OK
-    B-->>RMQ: ACK message
-
-    Note over Client,B: Read/Search Flow
-    Client->>B: GET /catalogo/search?query=...
-    B->>ES: Search with highlight
-    ES-->>B: Results + suggestions
-    B-->>Client: JSON response
-```
+![Fluxo Completo](docs/diagrams/full-sequence-flow-en.png)
 
 * * *
 
@@ -277,19 +190,8 @@ Download the files in the project root to test:
 
 ### ✨ Search Flow
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant B as Microservice B
-    participant ES as Elasticsearch
+![Fluxo da busca](docs/diagrams/search-flow-en.png)
 
-    U->>B: GET /catalogo/search?query=notbuk
-    B->>ES: fuzzy + multi_match query
-    ES-->>B: 0 results
-    B->>ES: spellcheck via _search suggest
-    ES-->>B: "notebook"
-    B-->>U: corrected results + highlight
-```
 
 ### 📲 Postman example with a typo:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/postman_1.png)
@@ -312,27 +214,13 @@ sequenceDiagram
 - Backed by `src/main/resources/seed/products-seed.json`
 
 **Seeder Flow:**
-```mermaid
-sequenceDiagram
-    autonumber
-    participant A as Micro A
-    participant DB as PostgreSQL
-    participant R as RabbitMQ
-    participant B as Micro B
-    participant ES as Elasticsearch
 
-    A->>DB: Check count(*)
-    DB-->>A: 0 (empty)
-    A->>A: Load JSON with 500 products
-    A->>DB: INSERT product
-    A->>R: CREATED event
-    R->>B: Deliver message
-    B->>ES: Index document
-```
+![Fluxo Seed](docs/diagrams/seed-flow-en.png)
+
 
 > ⚠️ **Important**: the seeder **does not run** if the broker is not OK.
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/microsa_start_fail_1.png)
-
+---
 **PostgreSQL in DBeaver:**  
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/Postgresql_DBeaver.png)
 
@@ -397,21 +285,9 @@ http://localhost:8081/autocomplete.html
 | `products.dead.queue` | Final DLQ | 14 days |
 
 ### Retry + DLQ Flow
-```mermaid
-sequenceDiagram
-    participant B as Microservice B
-    participant R as RabbitMQ
-    participant Q as Created Queue
-    participant Re as Retry Queue
-    participant DLQ as Dead Letter Queue
 
-    B->>Q: consume message
-    B-->>Q: error → NACK
-    Q->>Re: routed to Retry
-    Re-->>Q: after 5s TTL expires
-    Q->>B: process again
-    B-->>DLQ: after 3 attempts → DLX
-```
+![Fluxo Retry DLQ](docs/diagrams/retry-dlq-flow-en.png)
+
 
 **UI access:** `http://localhost:15672` (guest/guest)</br>
 RabbitMQ screenshot:
@@ -464,6 +340,10 @@ sh scripts/upgrade-index.sh
 ```
 Screenshot:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/script_upgrade-index.png)
+
+**Fluxo Script de upgrade versionamento de Índices:**
+
+![Upgrade da indices](docs/diagrams/upgrade-index-flow-en.png)
 
 ### When to Use Upgrade?
 - Analyzer changes
