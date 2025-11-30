@@ -398,6 +398,8 @@ PrintScreen:
 
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/script_upgrade-index.png)
 
+**Fluxo Script de upgrade versionamento de Índices:**
+
 ![Upgrade da indices](docs/diagrams/upgrade-index-flow.svg)
 
 ### Quando Usar Upgrade?
