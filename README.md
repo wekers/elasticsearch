@@ -85,8 +85,8 @@ This project demonstrates a **Distributed Catalog** with advanced search, autoco
 │      │                         │ RabbitMQ
 │      │                         ▼
 │      │                 ┌──────────────┐    REST     ┌─────────────┐
-│ Client│ ──────────────► │ Microservice │ ──────────► │ Elastic-    │
-│      │   HTTP/JSON      │      B       │             │   search    │
+│Client│ ──────────────► │ Microservice │ ──────────► │ Elastic-    │
+│      │   HTTP/JSON     │      B       │             │   search    │
 └──────┘                 └──────────────┘             └─────────────┘
 ```
 
@@ -104,7 +104,7 @@ This project demonstrates a **Distributed Catalog** with advanced search, autoco
 
 ### 🔁 End-to-End Flow (Sequence Diagram)
 
-![Fluxo Completo](docs/diagrams/full-sequence-flow-en.png)
+![Complete Flow](docs/diagrams/full-sequence-flow-en.png)
 
 * * *
 
@@ -132,7 +132,7 @@ cd elasticsearch/
 # 2. Start infrastructure
 docker compose up -d
 ```
-Screenshot:</br>
+Screenshot:   
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/docker-compose_1.png)
 
 ```bash
@@ -140,7 +140,7 @@ Screenshot:</br>
 cd "microsB - Consumer"
 sh scripts/reset-index.sh
 ```
-Screenshot:</br>
+Screenshot:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/script_reset-index.png)
 
 ```bash
@@ -190,7 +190,7 @@ Download the files in the project root to test:
 
 ### ✨ Search Flow
 
-![Fluxo da busca](docs/diagrams/search-flow-en.png)
+![Search Flow](docs/diagrams/search-flow-en.png)
 
 
 ### 📲 Postman example with a typo:
@@ -215,7 +215,7 @@ Download the files in the project root to test:
 
 **Seeder Flow:**
 
-![Fluxo Seed](docs/diagrams/seed-flow-en.png)
+![Seeder Flow](docs/diagrams/seed-flow-en.png)
 
 
 > ⚠️ **Important**: the seeder **does not run** if the broker is not OK.
@@ -223,6 +223,8 @@ Download the files in the project root to test:
 ---
 **PostgreSQL in DBeaver:**  
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/Postgresql_DBeaver.png)
+
+---
 
 ### 🅱 Microservice B – Consumer/Search (Elasticsearch)
 
@@ -264,6 +266,7 @@ http://localhost:8081/autocomplete.html
 - De-duplication
 
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/autocomplete_1.png)
+
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/autocomplete_2.png)
 
 * * *
@@ -286,7 +289,7 @@ http://localhost:8081/autocomplete.html
 
 ### Retry + DLQ Flow
 
-![Fluxo Retry DLQ](docs/diagrams/retry-dlq-flow-en.png)
+![Retry DLQ Flow](docs/diagrams/retry-dlq-flow-en.png)   
 
 
 **UI access:** `http://localhost:15672` (guest/guest)</br>
@@ -312,7 +315,7 @@ RabbitMQ screenshot:
 - `POST /queues/reprocess` - Reprocess a message
 - `POST /queues/delete` - Delete a DLQ message
 
-Browser view:</br>
+Browser view:
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/dashboard-queues_1.png)
 
 * * *
@@ -338,12 +341,13 @@ Screenshot:
 # Version upgrade (zero downtime)
 sh scripts/upgrade-index.sh
 ```
-Screenshot:
+Screenshot:   
 ![](https://raw.githubusercontent.com/wekers/elasticsearch/refs/heads/main/img/script_upgrade-index.png)
 
-**Fluxo Script de upgrade versionamento de Índices:**
 
-![Upgrade da indices](docs/diagrams/upgrade-index-flow-en.png)
+**Index Versioning Upgrade Script Flow:**
+
+![Index Upgrade](docs/diagrams/upgrade-index-flow-en.png)
 
 ### When to Use Upgrade?
 - Analyzer changes
