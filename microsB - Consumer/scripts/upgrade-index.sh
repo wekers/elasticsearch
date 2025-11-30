@@ -21,13 +21,24 @@ NEW_INDEX="${INDEX_BASE}_v${NEXT_VERSION}"
 echo "📄 Índice atual: $CURRENT_INDEX"
 echo "🚀 Criando novo índice: $NEW_INDEX"
 
-curl -s -X PUT "$ES_URL/$NEW_INDEX" \
+# ✅ CORREÇÃO: Criar índice primeiro com settings básicos
+curl -s -X PUT "$ES_URL/$NEW_INDEX" -H "Content-Type: application/json" -d '{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}' > /dev/null
+
+echo "📦 Aplicando mapping completo..."
+
+# ✅ CORREÇÃO: Aplicar mapping separadamente
+curl -s -X PUT "$ES_URL/$NEW_INDEX/_mapping" \
   -H "Content-Type: application/json" \
   --data-binary @"$SETTINGS_FILE" > /dev/null
 
 echo "📦 Reindexando dados..."
 
-curl -s -X POST "$ES_URL/_reindex" \
+curl -s -X POST "$ES_URL/_reindex?wait_for_completion=true" \
   -H "Content-Type: application/json" \
   -d "{
     \"source\": { \"index\": \"$CURRENT_INDEX\" },
@@ -47,11 +58,20 @@ curl -s -X POST "$ES_URL/_aliases" \
     ]
   }" > /dev/null
 
+# ✅ CORREÇÃO: Aguardar um pouco para garantir que tudo está sincronizado
+sleep 2
+
 echo ""
 echo "✅ Upgrade concluído!"
 echo "📖 Agora usando:"
 echo "   → Leitura: products_read → $NEW_INDEX"
 echo "   → Escrita: products_write → $NEW_INDEX"
+
+# ✅ CORREÇÃO: Verificar se o mapping foi aplicado corretamente
+echo ""
+echo "🔍 Verificando mapping..."
+curl -s -X GET "$ES_URL/$NEW_INDEX/_mapping" | jq '.[].mappings.properties | {nameSpellClean: .nameSpellClean, nameSpell: .nameSpell}'
+
 echo ""
 echo "❗ Caso queira remover o índice antigo:"
 echo "curl -X DELETE \"$ES_URL/$CURRENT_INDEX\""
