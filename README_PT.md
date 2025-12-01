@@ -400,7 +400,7 @@ PrintScreen:
 
 **Fluxo Script de upgrade versionamento de Índices:**
 
-![Upgrade da indices](docs/diagrams/upgrade-index-flow.svg)
+![Upgrade da indices](docs/diagrams/upgrade-index-flow.png)
 
 ### Quando Usar Upgrade?
 
