@@ -3,43 +3,58 @@ set -e
 
 ES_URL="http://localhost:9200"
 INDEX="products_v1"
-SETTINGS_FILE="src/main/resources/elasticsearch/product-settings.json"
+
+# ===============================
+#  BASE_DIR seguro (independente de onde executar)
+# ===============================
+BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SETTINGS_FILE="$BASE_DIR/src/main/resources/elasticsearch/product-settings.json"
 TEMP_SETTINGS="/tmp/product-settings-temp.json"
 
 echo "🔥 RESETANDO ÍNDICES DO CATÁLOGO..."
 
-# ✅ Cria settings temporário com replicas=0
+# 1. Ajustar réplicas temporariamente
 echo "⚙️  Ajustando configurações para single-node..."
+
+if [[ ! -f "$SETTINGS_FILE" ]]; then
+  echo "❌ ERRO: Não encontrei o SETTINGS_FILE:"
+  echo "   $SETTINGS_FILE"
+  exit 1
+fi
+
 cat "$SETTINGS_FILE" | jq '.settings.index.number_of_replicas = 0' > "$TEMP_SETTINGS"
 
-# 1. Remove aliases para evitar travas
+# 2. Remover aliases
 echo "🔗 Removendo aliases antigos..."
-curl -s -X POST "$ES_URL/_aliases" -H "Content-Type: application/json" -d '{
-  "actions": [
-    { "remove": { "index": "*", "alias": "products_read" }},
-    { "remove": { "index": "*", "alias": "products_write" }}
-  ]
-}' > /dev/null || true
+curl -s -X POST "$ES_URL/_aliases" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "actions": [
+      { "remove": { "index": "*", "alias": "products_read" }},
+      { "remove": { "index": "*", "alias": "products_write" }}
+    ]
+  }' > /dev/null || true
+echo
 
-# 2. Remover TODOS índices products_*
+# 3. Remover índices antigos
 echo "🗑️ Removendo índices antigos..."
-curl -s "$ES_URL/_cat/indices/products_*?h=index" | \
-while read line; do
+curl -s "$ES_URL/_cat/indices/products_*?h=index" | while read line; do
   if [[ ! -z "$line" ]]; then
     echo "   → Deletando índice: $line"
     curl -s -X DELETE "$ES_URL/$line" > /dev/null
   fi
 done
+echo
 
 sleep 2
 
-# 3. Criar novo índice com settings corrigido
+# 4. Criar novo índice
 echo "🚀 Criando novo índice: $INDEX"
 curl -s -X PUT "$ES_URL/$INDEX" \
   -H "Content-Type: application/json" \
-  --data-binary @"$TEMP_SETTINGS"
+  --data-binary @"$TEMP_SETTINGS" -w "\n"
 
-# 4. Criar aliases
+# 5. Criar aliases
 echo "🔗 Criando aliases products_read e products_write..."
 curl -s -X POST "$ES_URL/_aliases" \
   -H "Content-Type: application/json" \
@@ -48,22 +63,22 @@ curl -s -X POST "$ES_URL/_aliases" \
       { \"add\": { \"index\": \"$INDEX\", \"alias\": \"products_read\" }},
       { \"add\": { \"index\": \"$INDEX\", \"alias\": \"products_write\" }}
     ]
-  }"
+  }" -w "\n"
 
-# 5. Forçar GREEN status
+# 6. Ajustar replicas
 echo "🎯 Ajustando réplicas para garantir GREEN..."
 curl -s -X PUT "$ES_URL/$INDEX/_settings" \
   -H "Content-Type: application/json" \
   -d '{"index.number_of_replicas": 0}' > /dev/null
+echo
 
 sleep 1
 
-# 6. Validar
+# 7. Validar estado
 echo "🧪 Validando estado do índice..."
-HEALTH=$(curl -s "$ES_URL/_cluster/health/$INDEX?pretty" | jq -r '.status')
-UNASSIGNED=$(curl -s "$ES_URL/_cluster/health/$INDEX?pretty" | jq -r '.unassigned_shards')
+HEALTH=$(curl -s "$ES_URL/_cluster/health/$INDEX" | jq -r '.status')
+UNASSIGNED=$(curl -s "$ES_URL/_cluster/health/$INDEX" | jq -r '.unassigned_shards')
 
-# Limpar arquivo temporário
 rm -f "$TEMP_SETTINGS"
 
 if [[ "$HEALTH" == "green" && "$UNASSIGNED" == "0" ]]; then
@@ -73,5 +88,5 @@ else
   exit 1
 fi
 
-echo ""
+echo
 echo "🏁 Reset concluído!"
